@@ -23,7 +23,7 @@ double buyBuffer[];
 double sellBuffer[];
 
 // input parameters
-int confirmBarsCount = 3;
+int confirmBarsCount = 4;
 int minRequiredBars = 30; // Min required number of bars to analylize
 bool filterByTrend = true;
 
