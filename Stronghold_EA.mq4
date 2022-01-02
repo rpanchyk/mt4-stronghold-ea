@@ -88,6 +88,8 @@ extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 int orderTickets[]; // sorted order tickets
 double currentLots = startLots;
 GridManager *gm;
+double compensativeLots = 0;
+double gridProfit2 = 0;
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -99,8 +101,10 @@ void OnTick()
       return;
      }
 
-   gm = new GridManager(3, Symbol(), magic);
-   Comment(gm.Stats());
+   int gridCount = 30;
+
+   gm = new GridManager(gridCount, Symbol(), magic);
+   Comment(gm.Stats() + "\n GP: " + DoubleToStr(gridProfit2, 2));
 
    while(gm.HasNext())
      {
@@ -108,21 +112,73 @@ void OnTick()
 
       if(gm.GridIsLocked())
         {
-         if(gm.GridProfit() >= 0)
-           {
-            Print("Closing grid");
-            gm.CloseOrdersForGrid();
-            ResetState();
-           }
-         currentLots = startLots; // (!)
+         //if(gm.GridProfit() >= 0)
+         //  {
+         //   Print("Closing grid");
+         //   gm.CloseOrdersForGrid();
+         //   ResetState();
+         //  }
+         //currentLots = startLots; // (!)
          continue;
+        }
+
+      for(int i = 0; i < gridCount; i++)
+        {
+         if(gm.GridIsLocked(i))
+           {
+            //double lockedLots = gm.LastOrderLotsForGridIndex(i);
+            //if(compensativeLots >= lockedLots)
+
+            double prof = gm.GridProfit(i);
+
+            if(gridProfit2 > MathAbs(prof))
+              {
+               Print("Closing loss grid: ", i);
+               gm.CloseOrdersForGridIndex(i);
+               //compensativeLots = MathMax(compensativeLots - lockedLots, 0);
+               //gridProfit2 += prof;
+               gridProfit2 = MathMax(gridProfit2 + prof, 0);
+
+               //gridProfit2 = 0;
+               //break;
+              }
+           }
         }
 
       if(IsProfitReached())
         {
          Print("Profit reached");
+
+         gridProfit2 += gm.GridProfit();
+
          gm.CloseOrdersForGrid();
+
+         //compensativeLots += currentLots;
          ResetState();
+
+         //         for(int i = 0; i < gridCount; i++)
+         //           {
+         //            if(gm.GridIsLocked(i))
+         //              {
+         //               //double lockedLots = gm.LastOrderLotsForGridIndex(i);
+         //               //if(compensativeLots >= lockedLots)
+         //
+         //               double prof = gm.GridProfit(i);
+         //
+         //               if(gridProfit2 > MathAbs(prof))
+         //                 {
+         //                  Print("Closing loss grid: ", i);
+         //                  gm.CloseOrdersForGridIndex(i);
+         //                  //compensativeLots = MathMax(compensativeLots - lockedLots, 0);
+         //                  //gridProfit2 += prof;
+         //                  gridProfit2 = MathMax(gridProfit2 + prof, 0);
+         //
+         //                  //gridProfit2 = 0;
+         //                  //break;
+         //                 }
+         //              }
+         //           }
+
          continue;
         }
 
@@ -137,7 +193,7 @@ void OnTick()
            }
 
          Print("Loss reached");
-         OpenOpositeOrder();
+         OpenOpositeOrder3();
          continue;
         }
 
@@ -187,7 +243,8 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool IsProfitReached()
   {
-   return gm.TotalProfit() >= takeProfit;
+//return gm.TotalProfit() >= takeProfit;
+   return gm.GridProfit() >= takeProfit;
   }
 
 //+------------------------------------------------------------------+
@@ -385,6 +442,136 @@ void OpenOpositeOrder2()
          break;
         }
       opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
+     }
+
+   currentLots = IncrementLots(opositeLots, lotsCoef);
+   switch(orderType)
+     {
+      case OP_BUY:
+        {
+         gm.OpenOrder(OP_SELL, currentLots, "oposite_SELL");
+         break;
+        }
+      case OP_SELL:
+        {
+         gm.OpenOrder(OP_BUY, currentLots, "oposite_BUY");
+         break;
+        }
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OpenOpositeOrder3()
+  {
+   if(gm.GridOrdersCount() == 0)
+     {
+      return;
+     }
+
+   int networkOpositeCount = 0;
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return;
+        }
+
+      if(StringFind(OrderComment(), "oposite") != -1)
+        {
+         networkOpositeCount++;
+        }
+     }
+
+   int orderType = -1;
+   double opositeLots = 0;
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return;
+        }
+
+      if(orderType == -1) // define last order type
+        {
+         orderType = OrderType();
+        }
+      if(orderType != OrderType())
+        {
+         break;
+        }
+      opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
+     }
+
+   double lotsCoef = recoveryLotsCoef;
+   if(networkOpositeCount >= maxOpositeOrdersCountForDowngradeRecoveryLots)
+     {
+      if(lockIfMaxOpositeOrdersReached)
+        {
+         int beforeTicket = -1;
+         for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+           {
+            if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+              {
+               Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+               return;
+              }
+
+            if(orderType != OrderType())
+              {
+               break;
+              }
+
+            //gm.CloseOrdersForGrid(orderTickets[i]);
+            beforeTicket = OrderTicket();
+           }
+
+         for(int i = 0; i < gm.GridOrdersCount(); i++)
+           {
+            if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+              {
+               Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+               return;
+              }
+
+            if(beforeTicket == OrderTicket())
+              {
+               break;
+              }
+
+            gm.CloseOrdersForGrid(OrderTicket());
+           }
+
+         switch(orderType)
+           {
+            case OP_BUY:
+              {
+               gm.OpenOrder(OP_SELL, opositeLots, "lock_SELL");
+               break;
+              }
+            case OP_SELL:
+              {
+               gm.OpenOrder(OP_BUY, opositeLots, "lock_BUY");
+               break;
+              }
+           }
+
+         //lotsCoef = 1.0; // lock
+
+         // lock
+         //gm.OpenOrder(OP_SELL, buyLots, "lock_SELL");
+         //gm.OpenOrder(OP_BUY, sellLots, "lock_BUY");
+
+         currentLots = startLots; // (!)
+         return;
+        }
+      else
+        {
+         lotsCoef = 1.0 + networkOpositeCount * downgradeRecoveryLotsCoef;
+        }
      }
 
    currentLots = IncrementLots(opositeLots, lotsCoef);
