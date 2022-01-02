@@ -4,10 +4,10 @@
 //+------------------------------------------------------------------+
 #property copyright  "Copyright 2020, GoNaMore"
 #property link       "https://github.com/gonamore"
-#property version    "1.3"
+#property version    "1.4"
 #property strict
 
-#include <Stronghold_LIB_v1.3.mqh>
+#include <Stronghold_LIB_v1.4.mqh>
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
