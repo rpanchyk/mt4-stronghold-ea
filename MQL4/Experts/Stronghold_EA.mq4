@@ -4,28 +4,30 @@
 //+------------------------------------------------------------------+
 #property copyright  "Copyright 2020, GoNaMore"
 #property link       "https://github.com/gonamore"
-#property version    "1.2"
+#property version    "1.3"
 #property strict
 
-#include <Stronghold_LIB_v1.2.mqh>
+#include <Stronghold_LIB_v1.3.mqh>
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
    MOVING_AVERAGE, // По скользящей средней
    STOCHASTIC, // По стохастику
    STANDARD_DEVIATION, // По стандартному отклонению
-   ADX_OSMA // По пересечению ADX с подверждением OsMA
+   ADX_OSMA, // По пересечению ADX с подверждением OsMA
+   LEVEL_BREAKER
   };
 
 // config
 extern string _010 = "==== Общие ====";
 extern int magic = 100; // Уникальный идентификатор инструмента
 extern bool isDryMode = false; // Режим "Сушка" (закрытие сеток)
+extern bool showStats = true; // Показывать статистику?
 extern int refreshStatsPeriod = 60; // Интервал обновления статистики (секунд)
 
 extern string _020 = "==== Торговля ====";
 extern double startLots = 0.01; // Стартовый лот
-extern double maxLots = 100.0; // Максимальный лот
+extern double maxLots = 10.0; // Максимальный лот
 extern int takeProfit = 5; // Прибыль в валюте депозита
 extern int stopLoss = 10; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
@@ -34,6 +36,7 @@ extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
 extern int refillCount = 10; // Количество доливок
 extern double refillLotsCoef = 1.5; // Шаг лота доливки
+double maxGridRefillLots = 3; // Суммарный максимальный лот доливки по тренду
 
 extern string _040 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
@@ -115,7 +118,7 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   stats = gm.Stats();
+   stats = showStats ? gm.Stats() : "";
    lastOnTimerExecution = TimeCurrent();
   }
 
@@ -253,6 +256,7 @@ bool IsLossReached()
    double stop = resolvedStopLoss * currentLots / startLots; // Carefull (!)
 
    return OrderProfit() + OrderCommission() + OrderSwap() < stop * -1;
+//return OrderProfit() + OrderCommission() + OrderSwap() < resolvedStopLoss * -1;
   }
 
 //+------------------------------------------------------------------+
@@ -313,6 +317,8 @@ bool CanOpenRefillOrder(int operation)
       return false;
      }
 
+   double trendLots = 0;
+
    int orderType = -1;
    int refills = 0;
    int ticket = -1;
@@ -341,6 +347,15 @@ bool CanOpenRefillOrder(int operation)
         {
          ticket = OrderTicket(); // initial ticket in this direction
         }
+
+      trendLots += OrderLots(); // gather either BUY or SELL lots (!)
+     }
+
+//if(trendLots * recoveryLotsCoef >= maxLots)
+   if(trendLots > maxGridRefillLots)
+     {
+      //Print("Unable to refill because of lot limit: ", trendLots);
+      return false;
      }
 
    if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
@@ -385,6 +400,8 @@ bool CanOpenFirstOrder(int operation)
          return CanOpenFirstOrderStandardDeviation(operation);
       case ADX_OSMA:
          return CanOpenFirstOrderAdxOsMA(operation);
+      case LEVEL_BREAKER:
+         return CanOpenFirstOrderByLevelBreaker(operation);
       default:
          Print(__FUNCTION__, ": ", "Unknown openning first order type: ", openFirstOrderBy);
          return false;
@@ -535,6 +552,38 @@ bool CanOpenFirstOrderAdxOsMA(int operation)
            {
             Print(" =================== sell ", i2);
            }
+         return i2 > 0;
+        }
+      default:
+         Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
+         return false;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool CanOpenFirstOrderByLevelBreaker(int operation)
+  {
+   switch(operation)
+     {
+      case OP_BUY:
+        {
+         double i1 = iCustom(Symbol(), 0, "LevelBreaker_IND", 5, 0);
+         //if(i1 > 0)
+         //  {
+         //   Print(" =================== buy ", i1);
+         //  }
+         return i1 > 0;
+        }
+      case OP_SELL:
+        {
+
+         double i2 = iCustom(Symbol(), 0, "LevelBreaker_IND", 6, 0);
+         //if(i2 > 0)
+         //  {
+         //   Print(" =================== sell ", i2);
+         //  }
          return i2 > 0;
         }
       default:
