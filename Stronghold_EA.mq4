@@ -42,10 +42,6 @@ extern bool closeByLoss = false; // Закрывать ордера по сто�
 input string _050 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
 
-input string _051 = "==== Определение первого ордера сетки по пред. сетке ====";
-extern bool opOpositeOrderTypeToPreviousNetwork = true; // Перевертыш к пред. сетке
-extern bool opByTrendIfWasNoOpositeOrderInPreviousNetwork = false; // Учитивать переворот пред. сетки
-
 input string _052 = "==== Определение первого ордера сетки по скользяшке ====";
 extern ENUM_TIMEFRAMES maTimeframe = PERIOD_M1; // Таймфрейм
 extern int maPeriod = 56; // Период
@@ -55,10 +51,12 @@ ENUM_APPLIED_PRICE maAppliedPrice = PRICE_MEDIAN; // Применяемая це
 extern int maBackToHistory = 10; // Назад в историю для определения тренда
 
 input string _053 = "==== Определение первого ордера сетки по стохе ====";
+extern ENUM_TIMEFRAMES stochTimeframe = PERIOD_M1; // Таймфрейм
 extern int stochKperiod = 11; // K-период
 int stochDperiod = 16; // D-период
 extern int stochSlowing = 13; // Замедление
-ENUM_MA_METHOD stochMethod = MODE_SMA; // Метод
+ENUM_MA_METHOD stochMaMethod = MODE_SMA; // Метод MA
+ENUM_STO_PRICE stochPrice = STO_LOWHIGH; // Цена
 extern double stochUpLevel = 95.0; // Верхний уровень
 extern double stochDownLevel = 5.0; // Нижний уровень
 
@@ -66,7 +64,7 @@ input string _054 = "==== Определение первого ордера с�
 extern ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
 extern int sdMaPeriod = 20; // Период
 int sdMaShift = 0; // Сдвиг
-ENUM_MA_METHOD sdMaMethod = MODE_SMA; // Метод
+ENUM_MA_METHOD sdMaMethod = MODE_SMA; // Метод MA
 ENUM_APPLIED_PRICE sdAppliedPrice = PRICE_CLOSE; // Применяемая цена
 extern int sdBackToHistory = 10; // Назад в историю для определения тренда
 extern double sdLevel = 0.001; // Уровень для открытия ордера
@@ -82,7 +80,7 @@ extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
-double currentLots = startLots;
+double currentLots;
 int orderTickets[];
 GridManager *gm;
 
@@ -102,17 +100,12 @@ void OnTick()
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
-
-      if(gm.GridIsLocked())
-        {
-         continue;
-        }
+      currentLots = CurrentLots();
 
       if(IsProfitReached())
         {
          Print("Profit reached");
          gm.CloseOrdersForGrid();
-         ResetState();
          continue;
         }
 
@@ -122,7 +115,6 @@ void OnTick()
            {
             Print("Close by loss");
             gm.CloseOrdersForGrid();
-            ResetState();
             continue;
            }
 
@@ -164,11 +156,12 @@ void OnTick()
   }
 
 //+------------------------------------------------------------------+
-//| Set runtime variables to the initial state                       |
+//|                                                                  |
 //+------------------------------------------------------------------+
-void ResetState()
+double CurrentLots()
   {
-   currentLots = startLots;
+   double lastLots = gm.LastOrderLotsForGridIndex();
+   return lastLots != 0 ? lastLots : startLots;
   }
 
 //+------------------------------------------------------------------+
@@ -337,7 +330,7 @@ bool CanOpenRefillOrder(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenFirstOrder(int operation)
   {
-   if(isDryMode || gm.GridOrdersCount() > 0)
+   if(isDryMode || gm.GridOrdersCount() > 0 || gm.FirstOrderIsOpenedOnBar())
      {
       return false;
      }
@@ -345,9 +338,9 @@ bool CanOpenFirstOrder(int operation)
    switch(openFirstOrderBy)
      {
       case MOVING_AVERAGE:
-         return CanOpenFirstOrderMA(operation);
+         return CanOpenFirstOrderByMmovingAverage(operation);
       case STOCHASTIC:
-         return CanOpenFirstOrderStoch(operation);
+         return CanOpenFirstOrderByStochastic(operation);
       case STANDARD_DEVIATION:
          return CanOpenFirstOrderStandardDeviation(operation);
       case ADX_OSMA:
@@ -361,7 +354,7 @@ bool CanOpenFirstOrder(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderMA(int operation)
+bool CanOpenFirstOrderByMmovingAverage(int operation)
   {
    if(gm.TotalOrdersCount() > 0) // only one grid is allowed
      {
@@ -397,16 +390,16 @@ bool CanOpenFirstOrderMA(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderStoch(int operation)
+bool CanOpenFirstOrderByStochastic(int operation)
   {
    switch(operation)
      {
       case OP_BUY:
-         return iStochastic(Symbol(), 0, stochKperiod, stochDperiod, stochSlowing, stochMethod, 0, 0, 2) <= stochDownLevel
-                && iStochastic(Symbol(), 0, stochKperiod, stochDperiod, stochSlowing, stochMethod, 0, 0, 1) > stochDownLevel;
+         return iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 2) <= stochDownLevel
+                && iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 1) > stochDownLevel;
       case OP_SELL:
-         return iStochastic(Symbol(), 0, stochKperiod, stochDperiod, stochSlowing, stochMethod, 0, 0, 2) >= stochUpLevel
-                && iStochastic(Symbol(), 0, stochKperiod, stochDperiod, stochSlowing, stochMethod, 0, 0, 1) < stochUpLevel;
+         return iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 2) >= stochUpLevel
+                && iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 1) < stochUpLevel;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
