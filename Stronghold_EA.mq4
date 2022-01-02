@@ -15,7 +15,7 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
    STOCHASTIC, // По стохастику
    STANDARD_DEVIATION, // По стандартному отклонению
    ADX_OSMA, // По пересечению ADX с подверждением OsMA
-   LEVEL_BREAKER
+   LEVEL_BREAKER // По пробитию уровней
   };
 
 // config
@@ -30,6 +30,7 @@ extern double startLots = 0.01; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
 extern int takeProfit = 5; // Прибыль в валюте депозита
 extern int stopLoss = 10; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
+extern bool useProportionalStopLoss = true; // Использовать пропорциональный стоп-лосс от стартового лота
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
 extern string _030 = "==== Доливка ====";
@@ -241,22 +242,24 @@ bool IsProfitReached()
 //+------------------------------------------------------------------+
 bool IsLossReached()
   {
-   if(!recoveryEnabled || gm.GridOrdersCount() == 0)
+   int gridOrdersCount = gm.GridOrdersCount();
+
+   if(!recoveryEnabled || gridOrdersCount == 0)
      {
       return false;
      }
 
-   if(!OrderSelect(orderTickets[gm.GridOrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
+   if(!OrderSelect(orderTickets[gridOrdersCount - 1], SELECT_BY_TICKET, MODE_TRADES))
      {
       Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
       return false;
      }
 
    int resolvedStopLoss = stopLoss != 0 ? stopLoss : takeProfit;
-   double stop = resolvedStopLoss * currentLots / startLots; // Carefull (!)
+   double proportionalStopLoss = resolvedStopLoss * currentLots / startLots; // Carefull (!)
+   double stop = useProportionalStopLoss ? proportionalStopLoss : resolvedStopLoss;
 
    return OrderProfit() + OrderCommission() + OrderSwap() < stop * -1;
-//return OrderProfit() + OrderCommission() + OrderSwap() < resolvedStopLoss * -1;
   }
 
 //+------------------------------------------------------------------+
