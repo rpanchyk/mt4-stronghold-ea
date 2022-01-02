@@ -28,16 +28,13 @@ extern int refreshStatsPeriod = 60; // Интервал обновления с�
 extern string _020 = "==== Торговля ====";
 extern double startLots = 0.01; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
-extern int takeProfit = 5; // Прибыль в валюте депозита
-extern int stopLoss = 10; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
+extern int takeProfit = 25; // Прибыль в валюте депозита
+extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
 extern bool useProportionalStopLoss = true; // Использовать пропорциональный стоп-лосс от стартового лота
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
-extern string _021 = "==== Трейл ====";
-bool useTrailingStop = true;
-int trailingStep = 5;
-int trailUpStep = 5;
-int trailDownStep = 2;
+extern string _021 = "==== Трейлинг-стоп ====";
+int trailingStep = 5; // Шаг трейла (вверх и вниз от текущего профита)
 
 extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
@@ -97,9 +94,6 @@ double currentLots;
 int orderTickets[];
 GridManager *gm;
 
-double trailingTakeProfit = 0;
-double trailingStop = 0;
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -155,37 +149,22 @@ void OnTick()
       gm.GetNext(orderTickets);
       currentLots = CurrentLots();
 
-      // trail take profit
-      // trail stop loss
-
       if(IsProfitReached())
         {
-         if(useTrailingStop)
+         if(trailingStep > 0)
            {
             double profit = gm.GridProfit();
-
-            if(trailingTakeProfit == 0 && trailingStop == 0)
+            if(gm.UpdateTrailing(profit, trailingStep))
               {
-               trailingTakeProfit = profit + trailUpStep;
-               trailingStop = profit - trailDownStep;
                continue;
               }
 
-            if(profit >= trailingTakeProfit + trailUpStep)
+            if(profit <= gm.GetTrailingStopLoss())
               {
-               trailingTakeProfit = profit + trailUpStep;
-               trailingStop = profit - trailDownStep;
-               continue;
-              }
-
-            if(profit <= trailingStop)
-              {
-               trailingTakeProfit = 0;
-               trailingStop = 0;
-
-               Print("Profit reached by trail");
+               Print("Profit reached by trailing stop");
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
+               gm.ResetTrailing();
                continue;
               }
            }
