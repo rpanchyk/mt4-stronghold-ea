@@ -18,31 +18,32 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
   };
 
 // config
-input string _010 = "==== Настройки инструмента ====";
+extern string _010 = "==== Общие ====";
 extern int magic = 100; // Уникальный идентификатор инструмента
 extern bool isDryMode = false; // Режим "Сушка" (закрытие сеток)
+extern int refreshStatsPeriod = 60; // Интервал обновления статистики
 
-input string _020 = "==== Основные настройки ====";
+extern string _020 = "==== Торговля ====";
 extern double startLots = 0.1; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
 extern int takeProfit = 36; // Прибыль в валюте депозита
 extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
-input string _030 = "==== Доливка ====";
+extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
 extern int refillCount = 1; // Количество доливок
 extern double refillLotsCoef = 1.2; // Шаг лота доливки
 
-input string _040 = "==== Разрул ====";
+extern string _040 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
 extern double recoveryLotsCoef = 2.5; // Шаг лота противоположного ордера
 extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования)
 
-input string _050 = "==== Определение первого ордера сетки ====";
+extern string _050 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
 
-input string _052 = "==== Определение первого ордера сетки по скользяшке ====";
+extern string _052 = "==== Определение первого ордера сетки по скользяшке ====";
 extern ENUM_TIMEFRAMES maTimeframe = PERIOD_M1; // Таймфрейм
 extern int maPeriod = 56; // Период
 int maShift = 0; // Сдвиг
@@ -50,7 +51,7 @@ ENUM_MA_METHOD maMethod = MODE_SMA; // Метод
 ENUM_APPLIED_PRICE maAppliedPrice = PRICE_MEDIAN; // Применяемая цена
 extern int maBackToHistory = 10; // Назад в историю для определения тренда
 
-input string _053 = "==== Определение первого ордера сетки по стохе ====";
+extern string _053 = "==== Определение первого ордера сетки по стохе ====";
 extern ENUM_TIMEFRAMES stochTimeframe = PERIOD_M1; // Таймфрейм
 extern int stochKperiod = 11; // K-период
 int stochDperiod = 16; // D-период
@@ -60,7 +61,7 @@ ENUM_STO_PRICE stochPrice = STO_LOWHIGH; // Цена
 extern double stochUpLevel = 95.0; // Верхний уровень
 extern double stochDownLevel = 5.0; // Нижний уровень
 
-input string _054 = "==== Определение первого ордера сетки по стандартному отклонению ====";
+extern string _054 = "==== Определение первого ордера сетки по стандартному отклонению ====";
 extern ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
 extern int sdMaPeriod = 20; // Период
 int sdMaShift = 0; // Сдвиг
@@ -71,7 +72,7 @@ extern double sdLevel = 0.001; // Уровень для открытия орд�
 extern int sdBackPeriod = 6; // Исторический период
 extern double sdBackDiffCoef = 0.0006; // Историческая разница коеф.
 
-input string _055 = "==== Определение первого ордера сетки по ADX ====";
+extern string _055 = "==== Определение первого ордера сетки по ADX ====";
 extern int adxPeriod = 14; // ADX - Period
 extern ENUM_APPLIED_PRICE adxAppliedPrice = PRICE_CLOSE; // ADX - Applied price
 extern int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
@@ -80,10 +81,35 @@ extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
-double currentLots = startLots;
-//double currentLots;
+double currentLots;
 int orderTickets[];
 GridManager *gm;
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnInit()
+  {
+   gm = new GridManager(Symbol(), magic, gridsCount);
+   EventSetTimer(refreshStatsPeriod);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+   EventKillTimer();
+   delete gm;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnTimer()
+  {
+   Comment(gm.Stats());
+  }
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -95,25 +121,17 @@ void OnTick()
       return;
      }
 
-   gm = new GridManager(gridsCount, Symbol(), magic);
-   Comment(gm.Stats());
+   gm.Init();
 
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
-      //currentLots = CurrentLots();
-
-      double cl = CurrentLots();
-      if(cl != currentLots)
-        {
-         Print("========================================", currentLots, " != ", cl);
-        }
+      currentLots = CurrentLots();
 
       if(IsProfitReached())
         {
          Print("Profit reached");
          gm.CloseOrdersForGrid();
-         currentLots = startLots;
          continue;
         }
 
@@ -123,7 +141,6 @@ void OnTick()
            {
             Print("Close by loss");
             gm.CloseOrdersForGrid();
-            currentLots = startLots;
             continue;
            }
 
@@ -160,8 +177,6 @@ void OnTick()
          continue;
         }
      }
-
-   delete gm;
   }
 
 //+------------------------------------------------------------------+
@@ -169,7 +184,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 double CurrentLots()
   {
-   double lastLots = gm.LastOrderLotsForGridIndex();
+   double lastLots = gm.LastOrderLotsForGrid();
    return lastLots != 0 ? lastLots : startLots;
   }
 
