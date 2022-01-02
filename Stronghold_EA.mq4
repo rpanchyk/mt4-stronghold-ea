@@ -34,7 +34,7 @@ extern bool useProportionalStopLoss = true; // Использовать проп
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
 extern string _021 = "==== Трейлинг-стоп ====";
-int trailingStep = 5; // Шаг трейла (вверх и вниз от текущего профита)
+int trailingStep = 3; // Шаг трейла (вверх и вниз от текущего профита)
 
 extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
@@ -92,6 +92,7 @@ datetime lastOnTimerExecution;
 string stats;
 double currentLots;
 int orderTickets[];
+//double trailing[];
 GridManager *gm;
 
 //+------------------------------------------------------------------+
@@ -147,8 +148,10 @@ void OnTick()
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
+      //gm.GetNext2(orderTickets, trailing);
       currentLots = CurrentLots();
 
+              //Print("--- trailing: ", trailing[1]);
       if(IsProfitReached())
         {
          if(trailingStep > 0)
@@ -156,6 +159,10 @@ void OnTick()
             double profit = gm.GridProfit();
             if(gm.UpdateTrailing(profit, trailingStep))
               {
+              
+              //Print("--- gm.GetTrailingStopLoss(): ", trailing[1]);
+              //Print("--- gm.GetTrailingStopLoss(): ", gm.GetTrailingStopLoss());
+              
                continue;
               }
 

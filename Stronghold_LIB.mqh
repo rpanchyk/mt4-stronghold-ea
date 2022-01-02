@@ -570,19 +570,20 @@ bool GridManager::UpdateTrailing(double profit, int step, int gridIndex = -1)
    int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
    Grid grid = grids[resolvedGridIndex];
 
-   bool trailingNotInitialized = grid.trailingTakeProfit == 0 && grid.trailingStopLoss == 0;
+//bool trailingNotInitialized = grid.trailingTakeProfit == 0 && grid.trailingStopLoss == 0;
    bool trailingTakeProfitReached = profit >= grid.trailingTakeProfit + step;
 
-   if(trailingNotInitialized || trailingTakeProfitReached)
+//if(trailingNotInitialized || trailingTakeProfitReached)
+   if(trailingTakeProfitReached)
      {
-      grid.trailingTakeProfit = profit + step;
-      grid.trailingStopLoss = profit - step;
+      // use pointers (!)
+      grids[resolvedGridIndex].trailingTakeProfit = profit + step;
+      grids[resolvedGridIndex].trailingStopLoss = profit - step;
       return true;
      }
 
    return false;
   }
-
 
 //+------------------------------------------------------------------+
 //|                                                                  |
