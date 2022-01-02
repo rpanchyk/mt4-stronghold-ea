@@ -7,11 +7,10 @@
 #property version    "1.1"
 #property strict
 
-#include <StrongholdUtils.mqh>
+#include <Stronghold_LIB_v1.2.mqh>
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
-   PREVIOUS_NETWOWK, // По ордеру предыдущей сетки
    MOVING_AVERAGE, // По скользящей средней
    STOCHASTIC, // По стохастику
    STANDARD_DEVIATION, // По стандартному отклонению
@@ -345,8 +344,6 @@ bool CanOpenFirstOrder(int operation)
 
    switch(openFirstOrderBy)
      {
-      case PREVIOUS_NETWOWK:
-         return CanOpenFirstOrderByPreviousNetwork(operation);
       case MOVING_AVERAGE:
          return CanOpenFirstOrderMA(operation);
       case STOCHASTIC:
@@ -357,70 +354,6 @@ bool CanOpenFirstOrder(int operation)
          return CanOpenFirstOrderAdxOsMA(operation);
       default:
          Print(__FUNCTION__, ": ", "Unknown openning first order type: ", openFirstOrderBy);
-         return false;
-     }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenFirstOrderByPreviousNetwork(int operation)
-  {
-   RefreshRates();
-
-   int ordersHistoryTotal = OrdersHistoryTotal();
-   if(ordersHistoryTotal == 0)
-     {
-      Print(__FUNCTION__, ": ", "No history order, openning BUY");
-      return operation == OP_BUY;
-     }
-
-   int orderType = -1;
-   int prevOrderType = -1;
-   int prevTicket = -1;
-   for(int i = ordersHistoryTotal - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return false;
-        }
-      if(OrderSymbol() != Symbol() || OrderMagicNumber() != magic || OrderType() > 5)
-        {
-         continue;
-        }
-
-      if(orderType == -1 && (prevTicket > OrderTicket() || i == 0))
-        {
-         orderType = prevOrderType;
-         Print(__FUNCTION__, ": ", "last order type: ", orderType, " for ticket: ", OrderTicket());
-         break;
-        }
-
-      prevOrderType = OrderType();
-      prevTicket = OrderTicket();
-     }
-
-   if(orderType == -1)
-     {
-      Print(__FUNCTION__, ": ", "Cannot determine order type (seems new account), openning BUY");
-      return operation == OP_BUY;
-     }
-
-   if(opByTrendIfWasNoOpositeOrderInPreviousNetwork)
-     {
-      Print(__FUNCTION__, ": ", "Unsupported opByTrendIfWasNoOpositeOrderInPreviousNetwork yet");
-      return false;
-     }
-
-   switch(operation)
-     {
-      case OP_BUY:
-         return opOpositeOrderTypeToPreviousNetwork ? orderType == OP_SELL : true;
-      case OP_SELL:
-         return opOpositeOrderTypeToPreviousNetwork ? orderType == OP_BUY : true;
-      default:
-         Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
      }
   }
