@@ -163,8 +163,8 @@ void OnTick()
             if(gm.UpdateTrailing(profit, trailingStep))
               {
                Print("Trailing stop updated, profit: ", profit);
-               refillEnabled = false;
-               averagingEnabled = false;
+               //refillEnabled = false;
+               //averagingEnabled = false;
                continue;
               }
 
@@ -172,8 +172,8 @@ void OnTick()
               {
                Print("Trailing stop reached, profit: ", profit);
                gm.ResetTrailing();
-               refillEnabled = true;
-               averagingEnabled = true;
+               //refillEnabled = true;
+               //averagingEnabled = true;
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
                continue;
