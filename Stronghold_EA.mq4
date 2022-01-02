@@ -29,12 +29,12 @@ extern string _020 = "==== Торговля ====";
 extern double startLots = 0.01; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
 extern int takeProfit = 25; // Прибыль в валюте депозита
-extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
+extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = прибыль)
 extern bool useProportionalStopLoss = true; // Использовать пропорциональный стоп-лосс от стартового лота
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
 extern string _021 = "==== Трейлинг-стоп ====";
-int trailingStep = 3; // Шаг трейла (вверх и вниз от текущего профита)
+extern int trailingStep = 0; // Шаг трейла (вверх и вниз от текущего профита) (0 = выключен)
 
 extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
@@ -92,7 +92,6 @@ datetime lastOnTimerExecution;
 string stats;
 double currentLots;
 int orderTickets[];
-//double trailing[];
 GridManager *gm;
 
 //+------------------------------------------------------------------+
@@ -148,10 +147,8 @@ void OnTick()
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
-      //gm.GetNext2(orderTickets, trailing);
       currentLots = CurrentLots();
 
-              //Print("--- trailing: ", trailing[1]);
       if(IsProfitReached())
         {
          if(trailingStep > 0)
@@ -159,10 +156,7 @@ void OnTick()
             double profit = gm.GridProfit();
             if(gm.UpdateTrailing(profit, trailingStep))
               {
-              
-              //Print("--- gm.GetTrailingStopLoss(): ", trailing[1]);
-              //Print("--- gm.GetTrailingStopLoss(): ", gm.GetTrailingStopLoss());
-              
+               Print("Trailing updated");
                continue;
               }
 
@@ -264,7 +258,7 @@ double IncrementLots(double value, double coef)
 //+------------------------------------------------------------------+
 bool IsProfitReached()
   {
-   return gm.GridProfit() >= takeProfit;
+   return gm.GridProfit() >= takeProfit + trailingStep;
   }
 
 //+------------------------------------------------------------------+
@@ -601,24 +595,9 @@ bool CanOpenFirstOrderByLevelBreaker(int operation)
    switch(operation)
      {
       case OP_BUY:
-        {
-         double i1 = iCustom(Symbol(), 0, "LevelBreaker_IND", 5, 0);
-         //if(i1 > 0)
-         //  {
-         //   Print(" =================== buy ", i1);
-         //  }
-         return i1 > 0;
-        }
+         return iCustom(Symbol(), 0, "LevelBreaker_IND", 5, 0) > 0;
       case OP_SELL:
-        {
-
-         double i2 = iCustom(Symbol(), 0, "LevelBreaker_IND", 6, 0);
-         //if(i2 > 0)
-         //  {
-         //   Print(" =================== sell ", i2);
-         //  }
-         return i2 > 0;
-        }
+         return iCustom(Symbol(), 0, "LevelBreaker_IND", 6, 0) > 0;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
