@@ -40,7 +40,7 @@ extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
 extern int refillCount = 10; // Количество доливок
 extern double refillLotsCoef = 1.5; // Шаг лота доливки
-double maxGridRefillLots = 3; // Суммарный максимальный лот доливки по тренду
+extern double maxGridRefillLots = 2; // Максимальный лот доливки
 
 extern string _040 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
@@ -163,9 +163,9 @@ void OnTick()
             if(profit <= gm.GetTrailingStopLoss())
               {
                Print("Profit reached by trailing stop");
+               gm.ResetTrailing();
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
-               gm.ResetTrailing();
                continue;
               }
            }
@@ -196,28 +196,28 @@ void OnTick()
       if(CanOpenFirstOrder(OP_BUY))
         {
          Print("Can open BUY order");
-         gm.OpenOrder(OP_BUY, currentLots, "first BUY");
+         gm.OpenOrder(OP_BUY, currentLots, "first_BUY");
          continue;
         }
 
       if(CanOpenFirstOrder(OP_SELL))
         {
          Print("Can open SELL order");
-         gm.OpenOrder(OP_SELL, currentLots, "first SELL");
+         gm.OpenOrder(OP_SELL, currentLots, "first_SELL");
          continue;
         }
 
       if(CanOpenRefillOrder(OP_BUY))
         {
          Print("Can open BUY order - refill");
-         gm.OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill BUY");
+         gm.OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill_BUY");
          continue;
         }
 
       if(CanOpenRefillOrder(OP_SELL))
         {
          Print("Can open SELL order - refill");
-         gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill SELL");
+         gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill_SELL");
          continue;
         }
      }
@@ -378,10 +378,8 @@ bool CanOpenRefillOrder(int operation)
       trendLots += OrderLots(); // gather either BUY or SELL lots (!)
      }
 
-//if(trendLots * recoveryLotsCoef >= maxLots)
-   if(trendLots > maxGridRefillLots)
+   if(trendLots * refillLotsCoef > maxGridRefillLots)
      {
-      //Print("Unable to refill because of lot limit: ", trendLots);
       return false;
      }
 
@@ -592,6 +590,11 @@ bool CanOpenFirstOrderAdxOsMA(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenFirstOrderByLevelBreaker(int operation)
   {
+   if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
+     {
+      return false;
+     }
+
    switch(operation)
      {
       case OP_BUY:
