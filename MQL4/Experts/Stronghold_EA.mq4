@@ -4,7 +4,7 @@
 //+------------------------------------------------------------------+
 #property copyright  "Copyright 2020, GoNaMore"
 #property link       "https://github.com/gonamore"
-#property version    "1.1"
+#property version    "1.2"
 #property strict
 
 #include <Stronghold_LIB_v1.2.mqh>
@@ -21,19 +21,19 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
 extern string _010 = "==== Общие ====";
 extern int magic = 100; // Уникальный идентификатор инструмента
 extern bool isDryMode = false; // Режим "Сушка" (закрытие сеток)
-extern int refreshStatsPeriod = 60; // Интервал обновления статистики
+extern int refreshStatsPeriod = 60; // Интервал обновления статистики (секунд)
 
 extern string _020 = "==== Торговля ====";
-extern double startLots = 0.1; // Стартовый лот
-extern double maxLots = 10.0; // Максимальный лот
-extern int takeProfit = 36; // Прибыль в валюте депозита
-extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
+extern double startLots = 0.01; // Стартовый лот
+extern double maxLots = 100.0; // Максимальный лот
+extern int takeProfit = 5; // Прибыль в валюте депозита
+extern int stopLoss = 10; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
 extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
-extern int refillCount = 1; // Количество доливок
-extern double refillLotsCoef = 1.2; // Шаг лота доливки
+extern int refillCount = 10; // Количество доливок
+extern double refillLotsCoef = 1.5; // Шаг лота доливки
 
 extern string _040 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
@@ -81,6 +81,8 @@ extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
+datetime lastOnTimerExecution;
+string stats;
 double currentLots;
 int orderTickets[];
 GridManager *gm;
@@ -92,6 +94,11 @@ void OnInit()
   {
    gm = new GridManager(Symbol(), magic, gridsCount);
    EventSetTimer(refreshStatsPeriod);
+
+   if(IsTesting())
+     {
+      OnTimer();
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -108,7 +115,8 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   Comment(gm.Stats());
+   stats = gm.Stats();
+   lastOnTimerExecution = TimeCurrent();
   }
 
 //+------------------------------------------------------------------+
@@ -121,7 +129,13 @@ void OnTick()
       return;
      }
 
-   gm.Init();
+   if(IsTesting() && TimeCurrent() > lastOnTimerExecution + refreshStatsPeriod)
+     {
+      OnTimer();
+     }
+
+   Comment(stats);
+   gm.ResetPosition();
 
    while(gm.HasNext())
      {
@@ -132,6 +146,7 @@ void OnTick()
         {
          Print("Profit reached");
          gm.CloseOrdersForGrid();
+         gm.InitTicketsAndGrids();
          continue;
         }
 
@@ -141,6 +156,7 @@ void OnTick()
            {
             Print("Close by loss");
             gm.CloseOrdersForGrid();
+            gm.InitTicketsAndGrids();
             continue;
            }
 
