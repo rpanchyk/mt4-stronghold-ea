@@ -7,7 +7,7 @@
 #property version    "1.4"
 #property strict
 
-#include <Stronghold_LIB_v1.4.mqh>
+#include <Stronghold_LIB.mqh>
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
@@ -97,6 +97,7 @@ extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 datetime lastOnTimerExecution;
 string stats;
 double currentLots;
+double currentProfit;
 int orderTickets[];
 GridManager *gm;
 
@@ -154,21 +155,21 @@ void OnTick()
      {
       gm.GetNext(orderTickets);
       currentLots = CurrentLots();
+      currentProfit = gm.GridProfit();
 
       if(IsProfitReached())
         {
          if(trailingStep > 0)
            {
-            double profit = gm.GridProfit();
-            if(gm.UpdateTrailing(profit, trailingStep))
+            if(gm.UpdateTrailing(currentProfit, trailingStep))
               {
-               Print("Trailing stop updated, profit: ", profit);
+               Print("Trailing stop updated, profit: ", currentProfit);
                continue;
               }
 
-            if(profit <= gm.GetTrailingStopLoss())
+            if(currentProfit <= gm.GetTrailingStopLoss())
               {
-               Print("Trailing stop reached, profit: ", profit);
+               Print("Trailing stop reached, profit: ", currentProfit);
                gm.ResetTrailing();
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
@@ -279,7 +280,7 @@ double IncrementLots(double value, double coef)
 //+------------------------------------------------------------------+
 bool IsProfitReached()
   {
-   return gm.GridProfit() >= takeProfit + trailingStep;
+   return currentProfit >= takeProfit + trailingStep;
   }
 
 //+------------------------------------------------------------------+
@@ -289,7 +290,7 @@ bool IsLossReached()
   {
    int gridOrdersCount = gm.GridOrdersCount();
 
-   if(!recoveryEnabled || gridOrdersCount == 0)
+   if(!recoveryEnabled || gridOrdersCount == 0 || currentProfit > 0)
      {
       return false;
      }
