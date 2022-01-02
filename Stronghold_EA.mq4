@@ -1,11 +1,9 @@
+//|               Forex Expert Adviser for MetaTrader4               |
+//| The adviser serves series of grids               |
 //+------------------------------------------------------------------+
-//|                                                          my4.mq4 |
-//|                                         Copyright 2020, GoNaMore |
-//|                                      https://github.com/gonamore |
-//+------------------------------------------------------------------+
-#property copyright "Copyright 2020, GoNaMore"
-#property link      "https://github.com/gonamore"
-#property version   "4.8"
+#property copyright  "Copyright 2020, GoNaMore"
+#property link       "https://github.com/gonamore"
+#property version    "1.0"
 #property strict
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
@@ -15,6 +13,130 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
    STOCHASTIC, // По стохастику
    STANDARD_DEVIATION, // По стандартному отклонению
    ADX_OSMA // По пересечению ADX с подверждением OsMA
+  };
+
+enum OrderField
+  {
+   fOrderOpenTime,   // Время открытия
+   fOrderType,       // Тип
+   fOrderLots,       // Объём
+   fOrderOpenPrice,  // Цена открытия
+   fOrderStopLoss,   // S/L
+   fOrderTakeProfit, // T/P
+   fOrderCommission, // Комиссия
+   fOrderSwap,       // Своп
+   fOrderProfit      // Прибыль
+  };
+
+struct Grid
+  {
+   int               tickets[];
+  };
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class GridManager
+  {
+public:
+   void                Init()
+     {
+      index = 0;
+      InitTickets(fOrderOpenTime, sortedTickets);
+      //InitGrids();
+     }
+
+   bool              HasNext()
+     {
+      return index < ArraySize(grids);
+     }
+
+   void              GetNext(int &out[])
+     {
+      int size = ArraySize(grids);
+      ArrayResize(out, size);
+
+      for(int i = 0; i < size; i++)
+        {
+         out[i] = int(grids[index].tickets[i]);
+        }
+
+      index++;
+     }
+private:
+   int               sortedTickets[]; // sorted order tickets
+   Grid              grids[]; // set of grids
+   int               index;
+
+   // https://tlap.com/massivy-i-czikly/
+   void              InitTickets(OrderField field, int &out[])
+     {
+      RefreshRates();
+
+      double arr[][2];
+
+      int size = OrdersTotal();
+      ArrayResize(arr, size);
+
+      for(int i= size - 1; i >= 0; i--)
+        {
+         if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+           {
+            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+            return;
+           }
+         if(IsNotManagedOrder(OrderSymbol(), OrderMagicNumber()))
+           {
+            continue;
+           }
+
+         arr[i][1] = OrderTicket();
+
+         switch(field)
+           {
+            case fOrderOpenTime:
+               arr[i][0] = double(OrderOpenTime());
+               break;
+            case fOrderType:
+               arr[i][0] = OrderType();
+               break;
+            case fOrderLots:
+               arr[i][0] = OrderLots();
+               break;
+            case fOrderOpenPrice:
+               arr[i][0] = OrderOpenPrice();
+               break;
+            case fOrderStopLoss:
+               arr[i][0] = OrderStopLoss();
+               break;
+            case fOrderTakeProfit:
+               arr[i][0] = OrderTakeProfit();
+               break;
+            case fOrderCommission:
+               arr[i][0] = OrderCommission();
+               break;
+            case fOrderSwap:
+               arr[i][0] = OrderSwap();
+               break;
+            case fOrderProfit:
+               arr[i][0] = OrderProfit();
+               break;
+           }
+        }
+
+      ArraySort(arr);
+      ArrayResize(out, size);
+
+      for(int i = 0; i < size; i++)
+        {
+         out[i] = int(arr[i][1]);
+        }
+     }
+
+   bool              IsNotManagedOrder(string symbol, int magicNumber)
+     {
+      return symbol != Symbol() || magicNumber != magic;
+     }
   };
 
 // constants
@@ -88,6 +210,7 @@ extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
 int orderTickets[]; // sorted order tickets
+//int[] gridToTickets[]; // sorted order tickets by grid
 double currentLots = startLots;
 
 //+------------------------------------------------------------------+
@@ -100,7 +223,7 @@ void OnTick()
       return;
      }
 
-   InitOrderTickets();
+   InitAndSortOrderTickets(fOrderOpenTime, orderTickets);
    ShowStats();
 
    if(IsProfitReached())
@@ -154,21 +277,95 @@ void OnTick()
   }
 
 //+------------------------------------------------------------------+
+//| https://tlap.com/massivy-i-czikly/                               |
+//+------------------------------------------------------------------+
+void InitAndSortOrderTickets(OrderField field, int &out[])
+  {
+   RefreshRates();
+
+   double index[][2];
+
+   int size = OrdersTotal();
+   ArrayResize(index, size);
+
+   for(int i= size - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return;
+        }
+      if(IsNotManagedOrder(OrderSymbol(), OrderMagicNumber()))
+        {
+         continue;
+        }
+
+      index[i][1] = OrderTicket();
+
+      switch(field)
+        {
+         case fOrderOpenTime:
+            index[i][0] = double(OrderOpenTime());
+            break;
+         case fOrderType:
+            index[i][0] = OrderType();
+            break;
+         case fOrderLots:
+            index[i][0] = OrderLots();
+            break;
+         case fOrderOpenPrice:
+            index[i][0] = OrderOpenPrice();
+            break;
+         case fOrderStopLoss:
+            index[i][0] = OrderStopLoss();
+            break;
+         case fOrderTakeProfit:
+            index[i][0] = OrderTakeProfit();
+            break;
+         case fOrderCommission:
+            index[i][0] = OrderCommission();
+            break;
+         case fOrderSwap:
+            index[i][0] = OrderSwap();
+            break;
+         case fOrderProfit:
+            index[i][0] = OrderProfit();
+            break;
+        }
+     }
+
+   ArraySort(index);
+   ArrayResize(out, size);
+
+   for(int i = 0; i < size; i++)
+     {
+      out[i] = int(index[i][1]);
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool IsNotManagedOrder(string symbol, int magicNumber)
+  {
+   return symbol != Symbol() || magicNumber != magic;
+  }
+
+//+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void ShowStats()
   {
-   string orderStats = "";
    if(OrdersCount() > 0)
      {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
+      string orderStats = "";
+      for(int i = 0; i < OrdersCount(); i++)
         {
          if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
            {
             Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
             break;
            }
-
          orderStats += "\n"
                        + "  " + OrderComment() + ":"
                        + " Profit: " + DoubleToString(OrderProfit(), 2)
@@ -176,14 +373,28 @@ void ShowStats()
                        + " Swap: " + DoubleToString(OrderSwap(), 2)
                        + " Lots: " + DoubleToString(OrderLots(), 2);
         }
-     }
 
-   Comment(
-      "\n" + "Orders: ", orderStats,
-      "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0),
-      "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0),
-      "\n" + "Overall Profit: " + DoubleToString(GetProfit(), 0)
-   );
+      Comment(
+         "\n" + "Orders: ", orderStats,
+         "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0),
+         "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0),
+         "\n" + "Overall Profit: " + DoubleToString(GetProfit(), 0)
+      );
+     }
+   else
+     {
+      Comment(
+         "\n" + "No orders"
+      );
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int OrdersCount()
+  {
+   return ArraySize(orderTickets);
   }
 
 //+------------------------------------------------------------------+
@@ -370,11 +581,11 @@ void OpenOpositeOrder()
       opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
      }
 
-   //if(openFirstOrderBy == STANDARD_DEVIATION
-   //   && !CanOpenFirstOrderStandardDeviation(orderType)) // don't know why, but it works better with this filter (!)
-   //  {
-   //   return;
-   //  }
+//if(openFirstOrderBy == STANDARD_DEVIATION
+//   && !CanOpenFirstOrderStandardDeviation(orderType)) // don't know why, but it works better with this filter (!)
+//  {
+//   return;
+//  }
 
    int networkOpositeCount = 0;
    for(int i = OrdersCount() - 1; i >= 0; i--)
@@ -808,87 +1019,5 @@ int OpenOrder(int operation, double volume, string comment)
       Print(__FUNCTION__, ": ", "Cannot open ", operationAsString, " order: ", GetLastError(), " volume: ", volume);
       return -1;
      }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-int OrdersCount()
-  {
-   return ArraySize(orderTickets);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void InitOrderTickets()
-  {
-   RefreshRates();
-
-   int size = OrdersTotal();
-   ArrayResize(orderTickets, size);
-   ArrayInitialize(orderTickets, -1);
-
-   if(size > 0)
-     {
-      // fill unsorted tickets
-      for(int i = 0; i < size; i++)
-        {
-         if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            return;
-           }
-         if(OrderSymbol() != Symbol() || OrderMagicNumber() != magic)
-           {
-            continue;
-           }
-         orderTickets[i] = OrderTicket();
-        }
-
-      // make sort
-      for(int i = 0; i < size; i++)
-        {
-         for(int j = i+1; j < size; j++)
-           {
-            if(CompareOrderTickets(orderTickets[i], orderTickets[j]) == -1)
-              {
-               int ticket = orderTickets[i];
-               orderTickets[i] = orderTickets[j];
-               orderTickets[j] = ticket;
-              }
-           }
-        }
-     }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-int CompareOrderTickets(int ticket1, int ticket2)
-  {
-   if(!OrderSelect(ticket1, SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return 0;
-     }
-   datetime datetime1 = OrderOpenTime();
-
-   if(!OrderSelect(ticket2, SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return 0;
-     }
-   datetime datetime2 = OrderOpenTime();
-
-   if(datetime1 > datetime2)
-     {
-      return -1;
-     }
-   if(datetime1 < datetime2)
-     {
-      return 1;
-     }
-   return 0;
   }
 //+------------------------------------------------------------------+
