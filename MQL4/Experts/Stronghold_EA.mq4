@@ -163,8 +163,6 @@ void OnTick()
             if(gm.UpdateTrailing(profit, trailingStep))
               {
                Print("Trailing stop updated, profit: ", profit);
-               //refillEnabled = false;
-               //averagingEnabled = false;
                continue;
               }
 
@@ -172,8 +170,6 @@ void OnTick()
               {
                Print("Trailing stop reached, profit: ", profit);
                gm.ResetTrailing();
-               //refillEnabled = true;
-               //averagingEnabled = true;
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
                continue;
@@ -364,7 +360,7 @@ void OpenOpositeOrder()
 //+------------------------------------------------------------------+
 bool CanOpenRefillOrder(int operation)
   {
-   if(!refillEnabled || gm.GridOrdersCount() == 0)
+   if(!refillEnabled || gm.GridOrdersCount() == 0 || gm.GetTrailingStopLoss() > 0)
      {
       return false;
      }
@@ -435,7 +431,7 @@ bool CanOpenRefillOrder(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenAveragingOrder(int operation)
   {
-   if(!averagingEnabled || gm.GridOrdersCount() == 0)
+   if(!averagingEnabled || gm.GridOrdersCount() == 0 || gm.GetTrailingStopLoss() > 0)
      {
       return false;
      }
