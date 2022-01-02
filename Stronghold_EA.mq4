@@ -6,6 +6,8 @@
 #property version    "1.0"
 #property strict
 
+#include <GonamoreUtils.mqh>
+
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
    PREVIOUS_NETWOWK, // По ордеру предыдущей сетки
@@ -14,133 +16,6 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
    STANDARD_DEVIATION, // По стандартному отклонению
    ADX_OSMA // По пересечению ADX с подверждением OsMA
   };
-
-enum OrderField
-  {
-   fOrderOpenTime,   // Время открытия
-   fOrderType,       // Тип
-   fOrderLots,       // Объём
-   fOrderOpenPrice,  // Цена открытия
-   fOrderStopLoss,   // S/L
-   fOrderTakeProfit, // T/P
-   fOrderCommission, // Комиссия
-   fOrderSwap,       // Своп
-   fOrderProfit      // Прибыль
-  };
-
-struct Grid
-  {
-   int               tickets[];
-  };
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class GridManager
-  {
-public:
-   void                Init()
-     {
-      index = 0;
-      InitTickets(fOrderOpenTime, sortedTickets);
-      //InitGrids();
-     }
-
-   bool              HasNext()
-     {
-      return index < ArraySize(grids);
-     }
-
-   void              GetNext(int &out[])
-     {
-      int size = ArraySize(grids);
-      ArrayResize(out, size);
-
-      for(int i = 0; i < size; i++)
-        {
-         out[i] = int(grids[index].tickets[i]);
-        }
-
-      index++;
-     }
-private:
-   int               sortedTickets[]; // sorted order tickets
-   Grid              grids[]; // set of grids
-   int               index;
-
-   // https://tlap.com/massivy-i-czikly/
-   void              InitTickets(OrderField field, int &out[])
-     {
-      RefreshRates();
-
-      double arr[][2];
-
-      int size = OrdersTotal();
-      ArrayResize(arr, size);
-
-      for(int i= size - 1; i >= 0; i--)
-        {
-         if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            return;
-           }
-         if(IsNotManagedOrder(OrderSymbol(), OrderMagicNumber()))
-           {
-            continue;
-           }
-
-         arr[i][1] = OrderTicket();
-
-         switch(field)
-           {
-            case fOrderOpenTime:
-               arr[i][0] = double(OrderOpenTime());
-               break;
-            case fOrderType:
-               arr[i][0] = OrderType();
-               break;
-            case fOrderLots:
-               arr[i][0] = OrderLots();
-               break;
-            case fOrderOpenPrice:
-               arr[i][0] = OrderOpenPrice();
-               break;
-            case fOrderStopLoss:
-               arr[i][0] = OrderStopLoss();
-               break;
-            case fOrderTakeProfit:
-               arr[i][0] = OrderTakeProfit();
-               break;
-            case fOrderCommission:
-               arr[i][0] = OrderCommission();
-               break;
-            case fOrderSwap:
-               arr[i][0] = OrderSwap();
-               break;
-            case fOrderProfit:
-               arr[i][0] = OrderProfit();
-               break;
-           }
-        }
-
-      ArraySort(arr);
-      ArrayResize(out, size);
-
-      for(int i = 0; i < size; i++)
-        {
-         out[i] = int(arr[i][1]);
-        }
-     }
-
-   bool              IsNotManagedOrder(string symbol, int magicNumber)
-     {
-      return symbol != Symbol() || magicNumber != magic;
-     }
-  };
-
-// constants
-const int slippage = 50;
 
 // config
 input string _010 = "==== Настройки инструмента ====";
@@ -210,8 +85,8 @@ extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
 int orderTickets[]; // sorted order tickets
-//int[] gridToTickets[]; // sorted order tickets by grid
 double currentLots = startLots;
+GridManager *gm;
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -223,170 +98,66 @@ void OnTick()
       return;
      }
 
-   InitAndSortOrderTickets(fOrderOpenTime, orderTickets);
-   ShowStats();
+   gm = new GridManager(3, Symbol(), magic);
+   Comment(gm.GetStats());
 
-   if(IsProfitReached())
+   while(gm.HasNext())
      {
-      Print("Profit reached");
-      CloseOrders();
-      return;
-     }
+      gm.GetNext(orderTickets);
 
-   if(IsLossReached())
-     {
-      if(closeByLoss)
+      if(IsProfitReached())
         {
-         Print("Close by loss");
-         CloseOrders();
-         return;
-        }
-
-      Print("Loss reached");
-      OpenOpositeOrder();
-      return;
-     }
-
-   if(CanOpenFirstOrder(OP_BUY))
-     {
-      Print("Can open BUY order");
-      OpenOrder(OP_BUY, currentLots, "first BUY");
-      return;
-     }
-
-   if(CanOpenFirstOrder(OP_SELL))
-     {
-      Print("Can open SELL order");
-      OpenOrder(OP_SELL, currentLots, "first SELL");
-      return;
-     }
-
-   if(CanOpenRefillOrder(OP_BUY))
-     {
-      Print("Can open BUY order - refill");
-      OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill BUY");
-      return;
-     }
-
-   if(CanOpenRefillOrder(OP_SELL))
-     {
-      Print("Can open SELL order - refill");
-      OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill SELL");
-      return;
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| https://tlap.com/massivy-i-czikly/                               |
-//+------------------------------------------------------------------+
-void InitAndSortOrderTickets(OrderField field, int &out[])
-  {
-   RefreshRates();
-
-   double index[][2];
-
-   int size = OrdersTotal();
-   ArrayResize(index, size);
-
-   for(int i= size - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return;
-        }
-      if(IsNotManagedOrder(OrderSymbol(), OrderMagicNumber()))
-        {
+         Print("Profit reached");
+         gm.CloseOrdersForGrid();
+         ResetState();
          continue;
         }
 
-      index[i][1] = OrderTicket();
-
-      switch(field)
+      if(IsLossReached())
         {
-         case fOrderOpenTime:
-            index[i][0] = double(OrderOpenTime());
-            break;
-         case fOrderType:
-            index[i][0] = OrderType();
-            break;
-         case fOrderLots:
-            index[i][0] = OrderLots();
-            break;
-         case fOrderOpenPrice:
-            index[i][0] = OrderOpenPrice();
-            break;
-         case fOrderStopLoss:
-            index[i][0] = OrderStopLoss();
-            break;
-         case fOrderTakeProfit:
-            index[i][0] = OrderTakeProfit();
-            break;
-         case fOrderCommission:
-            index[i][0] = OrderCommission();
-            break;
-         case fOrderSwap:
-            index[i][0] = OrderSwap();
-            break;
-         case fOrderProfit:
-            index[i][0] = OrderProfit();
-            break;
-        }
-     }
-
-   ArraySort(index);
-   ArrayResize(out, size);
-
-   for(int i = 0; i < size; i++)
-     {
-      out[i] = int(index[i][1]);
-     }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool IsNotManagedOrder(string symbol, int magicNumber)
-  {
-   return symbol != Symbol() || magicNumber != magic;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void ShowStats()
-  {
-   if(OrdersCount() > 0)
-     {
-      string orderStats = "";
-      for(int i = 0; i < OrdersCount(); i++)
-        {
-         if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+         if(closeByLoss)
            {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
+            Print("Close by loss");
+            gm.CloseOrdersForGrid();
+            ResetState();
+            continue;
            }
-         orderStats += "\n"
-                       + "  " + OrderComment() + ":"
-                       + " Profit: " + DoubleToString(OrderProfit(), 2)
-                       + " Commission: " + DoubleToString(OrderCommission(), 2)
-                       + " Swap: " + DoubleToString(OrderSwap(), 2)
-                       + " Lots: " + DoubleToString(OrderLots(), 2);
+
+         Print("Loss reached");
+         OpenOpositeOrder();
+         continue;
         }
 
-      Comment(
-         "\n" + "Orders: ", orderStats,
-         "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0),
-         "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0),
-         "\n" + "Overall Profit: " + DoubleToString(GetProfit(), 0)
-      );
+      if(CanOpenFirstOrder(OP_BUY))
+        {
+         Print("Can open BUY order");
+         gm.OpenOrder(OP_BUY, currentLots, "first BUY");
+         continue;
+        }
+
+      if(CanOpenFirstOrder(OP_SELL))
+        {
+         Print("Can open SELL order");
+         gm.OpenOrder(OP_SELL, currentLots, "first SELL");
+         continue;
+        }
+
+      if(CanOpenRefillOrder(OP_BUY))
+        {
+         Print("Can open BUY order - refill");
+         gm.OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill BUY");
+         continue;
+        }
+
+      if(CanOpenRefillOrder(OP_SELL))
+        {
+         Print("Can open SELL order - refill");
+         gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill SELL");
+         continue;
+        }
      }
-   else
-     {
-      Comment(
-         "\n" + "No orders"
-      );
-     }
+
+   delete gm;
   }
 
 //+------------------------------------------------------------------+
@@ -394,56 +165,7 @@ void ShowStats()
 //+------------------------------------------------------------------+
 int OrdersCount()
   {
-   return ArraySize(orderTickets);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-double GetInProfit()
-  {
-   double result = 0;
-   if(OrdersCount() > 0)
-     {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
-        {
-         if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
-           }
-
-         if(OrderProfit() > 0)
-           {
-            result += OrderProfit() + OrderCommission() + OrderSwap();
-           }
-        }
-     }
-   return result;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-double GetInLoss()
-  {
-   double result = 0;
-   if(OrdersCount() > 0)
-     {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
-        {
-         if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
-           }
-
-         if(OrderProfit() < 0)
-           {
-            result += OrderProfit() + OrderCommission() + OrderSwap();
-           }
-        }
-     }
+   int result = ArraySize(orderTickets);
    return result;
   }
 
@@ -452,7 +174,7 @@ double GetInLoss()
 //+------------------------------------------------------------------+
 bool IsProfitReached()
   {
-   return GetProfit() >= takeProfit;
+   return gm.GetProfit() >= takeProfit;
   }
 
 //+------------------------------------------------------------------+
@@ -479,66 +201,6 @@ bool IsLossReached()
      }
 
    return false;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-double GetProfit()
-  {
-   double result = 0;
-   if(OrdersCount() > 0)
-     {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
-        {
-         if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
-           }
-
-         result += OrderProfit() + OrderCommission() + OrderSwap();
-        }
-     }
-   return result;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void CloseOrders()
-  {
-   if(OrdersCount() > 0)
-     {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
-        {
-         if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            return;
-           }
-
-         if(OrderType() == OP_BUY)
-           {
-            if(!OrderClose(OrderTicket(), OrderLots(), Bid, slippage, clrBlue))
-              {
-               Print(__FUNCTION__, ": ", "Unable to close BUY order: ", OrderTicket(), " error: ", GetLastError());
-               return;
-              }
-           }
-
-         if(OrderType() == OP_SELL)
-           {
-            if(!OrderClose(OrderTicket(), OrderLots(), Ask, slippage, clrRed))
-              {
-               Print(__FUNCTION__, ": ", "Unable to close SELL order: ", OrderTicket(), " error: ", GetLastError());
-               return;
-              }
-           }
-        }
-     }
-
-   ResetState();
   }
 
 //+------------------------------------------------------------------+
@@ -581,12 +243,6 @@ void OpenOpositeOrder()
       opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
      }
 
-//if(openFirstOrderBy == STANDARD_DEVIATION
-//   && !CanOpenFirstOrderStandardDeviation(orderType)) // don't know why, but it works better with this filter (!)
-//  {
-//   return;
-//  }
-
    int networkOpositeCount = 0;
    for(int i = OrdersCount() - 1; i >= 0; i--)
      {
@@ -618,20 +274,12 @@ void OpenOpositeOrder()
      {
       case OP_BUY:
         {
-         //if(!CanOpenFirstOrderStandardDeviation(OP_SELL))
-         //  {
-         //   return;
-         //  }
-         OpenOrder(OP_SELL, currentLots, "oposite SELL");
+         gm.OpenOrder(OP_SELL, currentLots, "oposite SELL");
          break;
         }
       case OP_SELL:
         {
-         //if(!CanOpenFirstOrderStandardDeviation(OP_BUY))
-         //  {
-         //   return;
-         //  }
-         OpenOrder(OP_BUY, currentLots, "oposite BUY");
+         gm.OpenOrder(OP_BUY, currentLots, "oposite BUY");
          break;
         }
      }
@@ -642,7 +290,8 @@ void OpenOpositeOrder()
 //+------------------------------------------------------------------+
 bool CanOpenFirstOrder(int operation)
   {
-   if(isDryMode || OrdersCount() > 0)
+//if(isDryMode || OrdersCount() > 0)
+   if(isDryMode)
      {
       return false;
      }
@@ -734,6 +383,14 @@ bool CanOpenFirstOrderByPreviousNetwork(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenFirstOrderMA(int operation)
   {
+   //RefreshRates();
+
+//if(gm.OrdersCount() > 0 || (gm.PrevOrdersCount() > 0 && !gm.PrevIsLocked()))
+   if(gm.OrdersCount() > 0)
+     {
+      return false;
+     }
+
    double prevPrice = iMA(Symbol(), maTimeframe, maPeriod, maShift, maMethod, maAppliedPrice, maBackToHistory);
    if(prevPrice == 0)
      {
@@ -920,41 +577,6 @@ bool CanOpenRefillOrder(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-double GetNetworkProfit()
-  {
-   if(OrdersCount() == 0)
-     {
-      return 0;
-     }
-
-   int orderType = -1;
-   double result = 0;
-
-   for(int i = OrdersCount() - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return 0;
-        }
-
-      if(orderType == -1) // define last order type
-        {
-         orderType = OrderType();
-        }
-      if(orderType != OrderType())
-        {
-         break;
-        }
-      result += OrderProfit() + OrderCommission() + OrderSwap();
-     }
-
-   return result;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
 double IncrementAndGetLots(double coef)
   {
    currentLots = IncrementLots(currentLots, coef);
@@ -971,53 +593,5 @@ double IncrementLots(double value, double coef)
    result = MathRound(result);
    result /= 100;
    return NormalizeDouble(result, 2);
-  }
-
-//+------------------------------------------------------------------+
-//| Returns order ticket or -1 if error occured                      |
-//+------------------------------------------------------------------+
-int OpenOrder(int operation, double volume, string comment)
-  {
-   string operationAsString;
-   double price;
-   color arrowColor;
-
-   RefreshRates();
-   switch(operation)
-     {
-      case OP_BUY:
-         operationAsString = "BUY";
-         price = Ask;
-         arrowColor = clrBlue;
-         break;
-      case OP_SELL:
-         operationAsString = "SELL";
-         price = Bid;
-         arrowColor = clrRed;
-         break;
-      default:
-         Print(__FUNCTION__, ": ", "Error operation not permitted: ", operation);
-         return -1;
-     }
-
-   int ticket = OrderSend(Symbol(), operation, volume, price, slippage, 0, 0, comment, magic, 0, arrowColor);
-   if(ticket != -1)
-     {
-      if(OrderSelect(ticket, SELECT_BY_TICKET))
-        {
-         Print(operationAsString, " order ", "ticket: ", ticket, " opened: ", OrderOpenPrice(), " with comment: ", comment);
-         return ticket;
-        }
-      else
-        {
-         Print(__FUNCTION__, ": ", "Cannot get ", operationAsString, " order by ticket: ", ticket, " with error:", GetLastError());
-         return -1;
-        }
-     }
-   else
-     {
-      Print(__FUNCTION__, ": ", "Cannot open ", operationAsString, " order: ", GetLastError(), " volume: ", volume);
-      return -1;
-     }
   }
 //+------------------------------------------------------------------+
