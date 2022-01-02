@@ -33,7 +33,8 @@ class GridManager
   {
 public:
                      GridManager(string inSymbol, int inMagic, int inGridsCount);
-   void              Init();
+   void              ResetPosition();
+   void              InitTicketsAndGrids();
    bool              HasNext();
    void              GetNext(int &out[]);
    void              CloseOrdersForGrid(int gridIndex);
@@ -49,7 +50,7 @@ private:
    int               gridsCount;
    string            symbol;
    int               magic;
-   int               index;
+   int               index; // current grid index
    int               sortedTickets[]; // sorted order tickets
    Grid              grids[]; // set of grids
 
@@ -68,16 +69,25 @@ GridManager::GridManager(string inSymbol, int inMagic, int inGridsCount)
    gridsCount = inGridsCount;
    symbol = inSymbol;
    magic = inMagic;
+
+   ResetPosition();
+   InitTicketsAndGrids();
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void GridManager::Init()
+void GridManager::ResetPosition()
+  {
+   index = -1;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void GridManager::InitTicketsAndGrids()
   {
    RefreshRates();
-
-   index = -1;
    InitTickets(fOrderOpenTime, sortedTickets);
    InitGrids();
   }
@@ -476,8 +486,7 @@ int GridManager::OpenOrder(int operation, double volume, string comment)
          Print(operationAsString, " order ", "ticket: ", ticket, " opened: ", OrderOpenPrice(), " with comment: ", orderComment);
 
          // update tickets info
-         InitTickets(fOrderOpenTime, sortedTickets);
-         InitGrids();
+         InitTicketsAndGrids();
 
          return ticket;
         }
