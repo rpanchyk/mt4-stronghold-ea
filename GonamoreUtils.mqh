@@ -368,6 +368,8 @@ void GridManager::CloseOrdersForGridIndex(int gridIndex)
            }
         }
      }
+
+   grids[gridIndex].locked = false;
   }
 
 //+------------------------------------------------------------------+
