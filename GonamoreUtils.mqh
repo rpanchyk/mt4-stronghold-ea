@@ -36,7 +36,8 @@ public:
                      GridManager(int gridCount, string symbolName, int magicNumber);
    bool              HasNext();
    void              GetNext(int &out[]);
-   void              CloseOrdersForGrid();
+   void              CloseOrdersForGrid(int ticket);
+   void              CloseOrdersForGridIndex(int gridIndex);
    string            Stats();
    int               TotalOrdersCount();
    int               GridOrdersCount(int gridIndex);
@@ -46,6 +47,7 @@ public:
    bool              GridIsLocked(int gridIndex);
    bool              IsLockUnbalance();
    bool              PrevGridIsLocked();
+   double            LastOrderLotsForGridIndex(int gridIndex);
 
    // trash:
    int               PrevOrdersCount();
@@ -281,7 +283,7 @@ int GridManager::GridsCount()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void GridManager::CloseOrdersForGrid()
+void GridManager::CloseOrdersForGrid(int ticket = -1)
   {
    int ordersCount = ArraySize(grids[index].tickets);
 
@@ -289,6 +291,11 @@ void GridManager::CloseOrdersForGrid()
      {
       for(int i = ordersCount - 1; i >= 0; i--)
         {
+         if(ticket != -1 && ticket != grids[index].tickets[i])
+           {
+            continue;
+           }
+
          if(!OrderSelect(grids[index].tickets[i], SELECT_BY_TICKET, MODE_TRADES))
            {
             Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
@@ -319,6 +326,159 @@ void GridManager::CloseOrdersForGrid()
         }
      }
   }
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void GridManager::CloseOrdersForGridIndex(int gridIndex)
+  {
+   int ordersCount = ArraySize(grids[gridIndex].tickets);
+
+   if(ordersCount > 0)
+     {
+      for(int i = ordersCount - 1; i >= 0; i--)
+        {
+         if(!OrderSelect(grids[gridIndex].tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+           {
+            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+            return;
+           }
+
+         int orderType = OrderType();
+         int orderTicket = OrderTicket();
+         double orderLots = OrderLots();
+
+         if(orderType == OP_BUY)
+           {
+            if(!OrderClose(orderTicket, orderLots, Bid, slippage, clrBlue))
+              {
+               Print(__FUNCTION__, ": ", "Unable to close BUY order: ", orderTicket, " error: ", GetLastError());
+               return;
+              }
+           }
+
+         if(orderType == OP_SELL)
+           {
+            if(!OrderClose(orderTicket, orderLots, Ask, slippage, clrRed))
+              {
+               Print(__FUNCTION__, ": ", "Unable to close SELL order: ", orderTicket, " error: ", GetLastError());
+               return;
+              }
+           }
+        }
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+//bool GridManager::ClosePartPosition(int tr)
+//  {
+//   double ml = MarketInfo(Symbol(),MODE_LOTSTEP);
+//   double close_lot;
+//   int cnt = GridOrdersCount();
+//
+//   for(int i=cnt-1; i>=0; i--)
+//     {
+//
+//      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+//         continue;
+//      //Опционально
+//      if(OrderSymbol() != Symbol())
+//         continue;
+//      //Опционально
+//      if(OrderMagicNumber() != mn)
+//         continue;
+//
+//      close_lot=NormalizeDouble(OrderLots()/2,2);
+//      if(close_lot<ml)
+//         close_lot=ml;
+//
+//      if(OrderType()==OP_BUY)
+//        {
+//         if(OrderStopLoss()==0 || OrderStopLoss() < OrderOpenPrice())
+//           {
+//            if((MarketInfo(OrderSymbol(),MODE_BID) - (OrderOpenPrice() + (OrderCommission()*MarketInfo(OrderSymbol(),MODE_POINT)) + (OrderSwap()*MarketInfo(OrderSymbol(),MODE_POINT)))) > (tr*MarketInfo(OrderSymbol(),MODE_POINT)))
+//              {
+//               Print(Symbol()," ClosePartPosition. Move stop and close half");
+//               bool ModifyBuy_1 = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble((MarketInfo(OrderSymbol(),MODE_BID) - tr*MarketInfo(OrderSymbol(),MODE_POINT)),(int)MarketInfo(OrderSymbol(),MODE_DIGITS)),OrderTakeProfit(),0,StopColor);
+//               if(!ModifyBuy_1)
+//                  Print(Symbol()," ClosePartPosition. OrderModify Buy fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderModify Buy successfully");
+//
+//               bool CloseBuy_1 = OrderClose(OrderTicket(),close_lot,MarketInfo(OrderSymbol(),MODE_BID),Slippage,CloseColor);
+//               if(!CloseBuy_1)
+//                  Print(Symbol()," ClosePartPosition. OrderClose Buy fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderClose Buy successfully");
+//              }
+//           }
+//         else
+//           {
+//            if((MarketInfo(OrderSymbol(),MODE_BID) - OrderStopLoss()) > (tr*MarketInfo(OrderSymbol(),MODE_POINT)*2))
+//              {
+//               Print(Symbol()," ClosePartPosition. Move stop and close half");
+//               bool ModifyBuy_2 = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble((MarketInfo(OrderSymbol(),MODE_BID) - tr*MarketInfo(OrderSymbol(),MODE_POINT)),(int)MarketInfo(OrderSymbol(),MODE_DIGITS)),OrderTakeProfit(),0,StopColor);
+//               if(!ModifyBuy_2)
+//                  Print(Symbol()," ClosePartPosition. OrderModify Buy fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderModify Buy successfully");
+//
+//               bool CloseBuy_2 = OrderClose(OrderTicket(),close_lot,MarketInfo(OrderSymbol(),MODE_BID),Slippage,CloseColor);
+//               if(!CloseBuy_2)
+//                  Print(Symbol()," ClosePartPosition. OrderClose Buy fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderClose Buy successfully");
+//              }
+//           }
+//        }
+//
+//      if(OrderType()==OP_SELL)
+//        {
+//         if(OrderStopLoss()==0 || OrderStopLoss() > OrderOpenPrice())
+//           {
+//            if(((OrderOpenPrice() - (OrderCommission()*MarketInfo(OrderSymbol(),MODE_POINT)) - (OrderSwap()*MarketInfo(OrderSymbol(),MODE_POINT))) - MarketInfo(OrderSymbol(),MODE_ASK)) > (tr*MarketInfo(OrderSymbol(),MODE_POINT)))
+//              {
+//               Print(Symbol()," ClosePartPosition. Move stop and close half");
+//               bool ModifySell_1 = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble((MarketInfo(OrderSymbol(),MODE_ASK) + tr*MarketInfo(OrderSymbol(),MODE_POINT)),(int)MarketInfo(OrderSymbol(),MODE_DIGITS)),OrderTakeProfit(),0,StopColor);
+//               if(!ModifySell_1)
+//                  Print(Symbol()," ClosePartPosition. OrderModify Sell fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderModify Sell successfully");
+//
+//               bool CloseSell_1 = OrderClose(OrderTicket(),close_lot,MarketInfo(OrderSymbol(),MODE_ASK),Slippage,CloseColor);
+//               if(!CloseSell_1)
+//                  Print(Symbol()," ClosePartPosition. OrderClose Sell fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderClose Sell successfully");
+//              }
+//           }
+//         else
+//           {
+//            if(OrderStopLoss()-MarketInfo(OrderSymbol(),MODE_ASK)>tr*MarketInfo(OrderSymbol(),MODE_POINT)*2)
+//              {
+//               Print(Symbol()," ClosePartPosition. Move stop and close half");
+//               bool ModifySell_2 = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble((MarketInfo(OrderSymbol(),MODE_ASK) + tr*MarketInfo(OrderSymbol(),MODE_POINT)),(int)MarketInfo(OrderSymbol(),MODE_DIGITS)),OrderTakeProfit(),0,StopColor);
+//               if(!ModifySell_2)
+//                  Print(Symbol()," ClosePartPosition. OrderModify Sell fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderModify Sell successfully");
+//
+//               bool CloseSell_2 = OrderClose(OrderTicket(),close_lot,MarketInfo(OrderSymbol(),MODE_ASK),Slippage,CloseColor);
+//               if(!CloseSell_2)
+//                  Print(Symbol()," ClosePartPosition. OrderClose Sell fail #",GetLastError());
+//               else
+//                  Print(Symbol()," ClosePartPosition. OrderClose Sell successfully");
+//              }
+//           }
+//        }
+//
+//
+//     }
+//   return (True);
+//  }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -649,5 +809,27 @@ bool GridManager::IsLockUnbalance()
 bool GridManager::PrevGridIsLocked()
   {
    return index > 0 && grids[index - 1].locked;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double GridManager::LastOrderLotsForGridIndex(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   Grid grid = grids[resolvedGridIndex];
+   int ticketsCount = ArraySize(grid.tickets);
+
+   for(int i = ticketsCount - 1; i >= 0 ; i--)
+     {
+      if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         break;
+        }
+
+      return OrderLots();
+     }
+   return 0;
   }
 //+------------------------------------------------------------------+
