@@ -26,20 +26,19 @@ extern bool isDryMode = false; // Режим "Сушка" (закрытие се
 input string _020 = "==== Основные настройки ====";
 extern double startLots = 0.1; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
-extern int takeProfit = 36; // Прибыль в валюте депозита (центы)
-extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (центы) 0 = TP
-extern int gridsCount = 3; // Количество сеток (зависит от типа определения первого ордера)
+extern int takeProfit = 36; // Прибыль в валюте депозита
+extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = Прибыль)
+extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
 input string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
-extern int refillProfitLevel = 50; // Доливка при достижении процента от профита
-extern int refillCount = 1;
+extern int refillCount = 1; // Количество доливок
 extern double refillLotsCoef = 1.2; // Шаг лота доливки
 
 input string _040 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
-extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования индикаторов)
 extern double recoveryLotsCoef = 2.5; // Шаг лота противоположного ордера
+extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования)
 
 input string _050 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
@@ -87,7 +86,6 @@ extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 double currentLots = startLots;
 int orderTickets[];
 GridManager *gm;
-bool emergencyMode = false;
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -108,15 +106,6 @@ void OnTick()
 
       if(gm.GridIsLocked())
         {
-         continue;
-        }
-
-      if(emergencyMode && gm.GridProfit() >= 0)
-        {
-         Print("Profit reached");
-         gm.CloseOrdersForGrid();
-         ResetState();
-         emergencyMode = false;
          continue;
         }
 
@@ -157,14 +146,14 @@ void OnTick()
          continue;
         }
 
-      if(CanOpenRefillOrder2(OP_BUY))
+      if(CanOpenRefillOrder(OP_BUY))
         {
          Print("Can open BUY order - refill");
          gm.OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill BUY");
          continue;
         }
 
-      if(CanOpenRefillOrder2(OP_SELL))
+      if(CanOpenRefillOrder(OP_SELL))
         {
          Print("Can open SELL order - refill");
          gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill SELL");
@@ -198,14 +187,6 @@ double IncrementAndGetLots(double coef)
 double IncrementLots(double value, double coef)
   {
    double result = MathMin(value * coef, maxLots);
-
-//   double maxlot = AccountFreeMargin() / MarketInfo(Symbol(), MODE_MARGINREQUIRED);
-//result = MathMin(result, maxlot);
-//   if(result > maxlot)
-//     {
-//      emergencyMode = true;
-//     }
-
    result *= 100;
    result = MathRound(result);
    result /= 100;
@@ -275,32 +256,6 @@ void OpenOpositeOrder()
 
    currentLots = IncrementLots(opositeLots, recoveryLotsCoef);
 
-//   int networkOpositeCount = 0;
-//   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
-//     {
-//      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-//        {
-//         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-//         return;
-//        }
-//
-//      if(StringFind(OrderComment(), "oposite") != -1)
-//        {
-//         networkOpositeCount++;
-//        }
-//     }
-//
-//   double lotsCoef = 1.1;
-//   if(networkOpositeCount == 1)
-//     {
-//      lotsCoef = 1.2;
-//     }
-//   if(networkOpositeCount > 1)
-//     {
-//      lotsCoef = 1.0 + MathLog10(networkOpositeCount);
-//     }
-//   currentLots = IncrementLots(opositeLots, lotsCoef);
-
    switch(orderType)
      {
       case OP_BUY:
@@ -326,50 +281,8 @@ bool CanOpenRefillOrder(int operation)
       return false;
      }
 
-   if(!OrderSelect(orderTickets[gm.GridOrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return false;
-     }
-
-//   if(openFirstOrderBy == STANDARD_DEVIATION && StringFind(OrderComment(), "oposite") != -1)
-//     {
-//      return false;
-//     }
-//
-//   if(openFirstOrderBy == PREVIOUS_NETWOWK && StringFind(OrderComment(), "oposite") != -1)
-//     {
-//      return false;
-//     }
-
-   double refillLevel = 1.0 * takeProfit * refillProfitLevel / 100;
-
-   if(operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask && OrderProfit() + OrderCommission() + OrderSwap() > refillLevel)
-     {
-      return true;
-     }
-
-   if(operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid && OrderProfit() + OrderCommission() + OrderSwap() > refillLevel)
-     {
-      return true;
-     }
-
-   return false;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenRefillOrder2(int operation)
-  {
-   if(!refillEnabled || gm.GridOrdersCount() == 0)
-     {
-      return false;
-     }
-
    int orderType = -1;
    int refills = 0;
-   bool hasOposite = false;
    int ticket = -1;
    for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
      {
@@ -379,11 +292,6 @@ bool CanOpenRefillOrder2(int operation)
          return false;
         }
 
-      //if(StringFind(OrderComment(), "oposite") != -1)
-      //  {
-      //   return false;
-      //  }
-
       if(orderType == -1) // define last order type
         {
          orderType = OrderType();
@@ -392,55 +300,31 @@ bool CanOpenRefillOrder2(int operation)
         {
          break;
         }
+
       if(StringFind(OrderComment(), "refill") != -1)
         {
          refills++;
         }
       else
         {
-         ticket = OrderTicket();
+         ticket = OrderTicket(); // initial ticket in this direction
         }
      }
 
-
-//if(!OrderSelect(orderTickets[gm.GridOrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
    if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
      {
       Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
       return false;
      }
 
-
-//   if(openFirstOrderBy == STANDARD_DEVIATION && StringFind(OrderComment(), "oposite") != -1)
-//     {
-//      return false;
-//     }
-//
-//   if(openFirstOrderBy == PREVIOUS_NETWOWK && StringFind(OrderComment(), "oposite") != -1)
-//     {
-//      return false;
-//     }
-
-//double refillLevel = 1.0 * takeProfit * refillProfitLevel / 100;
-
-//if(hasOposite)
-//   //if(hasOposite && OrderLots() >= 1.5)
-//   //if(OrderLots() >= 3)
-//  {
-//   return false;
-//  }
-
    double profit = OrderProfit() + OrderCommission() + OrderSwap();
    double refillLevel = 1.0 * takeProfit / (refillCount + 1);
    bool canRefill = refillCount > refills && profit > refillLevel * (refills + 1);
 
-//if(operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask && OrderProfit() + OrderCommission() + OrderSwap() > refillLevel)
    if(operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask && canRefill)
      {
       return true;
      }
-
-//if(operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid && OrderProfit() + OrderCommission() + OrderSwap() > refillLevel)
    if(operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid && canRefill)
      {
       return true;
