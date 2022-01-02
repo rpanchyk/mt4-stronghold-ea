@@ -40,17 +40,23 @@ extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
 extern int refillCount = 10; // Количество доливок
 extern double refillLotsCoef = 1.5; // Шаг лота доливки
-extern double maxGridRefillLots = 2; // Максимальный лот доливки
+extern double refillMaxLots = 2; // Максимальный лот доливки
 
-extern string _040 = "==== Разрул ====";
+extern string _040 = "==== Усреднение ====";
+extern bool averagingEnabled = true; // Активировано?
+extern int averagingCount = 10; // Количество усреднений
+extern double averagingLotsCoef = 1.5; // Шаг лота усреднения
+extern double averagingMaxLots = 2; // Максимальный лот усреднения
+
+extern string _050 = "==== Разрул ====";
 extern bool recoveryEnabled = true; // Активировано?
 extern double recoveryLotsCoef = 2.5; // Шаг лота противоположного ордера
 extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования)
 
-extern string _050 = "==== Определение первого ордера сетки ====";
+extern string _100 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
 
-extern string _052 = "==== Определение первого ордера сетки по скользяшке ====";
+extern string _110 = "==== Определение первого ордера сетки по скользяшке ====";
 extern ENUM_TIMEFRAMES maTimeframe = PERIOD_M1; // Таймфрейм
 extern int maPeriod = 56; // Период
 int maShift = 0; // Сдвиг
@@ -58,7 +64,7 @@ ENUM_MA_METHOD maMethod = MODE_SMA; // Метод
 ENUM_APPLIED_PRICE maAppliedPrice = PRICE_MEDIAN; // Применяемая цена
 extern int maBackToHistory = 10; // Назад в историю для определения тренда
 
-extern string _053 = "==== Определение первого ордера сетки по стохе ====";
+extern string _120 = "==== Определение первого ордера сетки по стохе ====";
 extern ENUM_TIMEFRAMES stochTimeframe = PERIOD_M1; // Таймфрейм
 extern int stochKperiod = 11; // K-период
 int stochDperiod = 16; // D-период
@@ -68,7 +74,7 @@ ENUM_STO_PRICE stochPrice = STO_LOWHIGH; // Цена
 extern double stochUpLevel = 95.0; // Верхний уровень
 extern double stochDownLevel = 5.0; // Нижний уровень
 
-extern string _054 = "==== Определение первого ордера сетки по стандартному отклонению ====";
+extern string _130 = "==== Определение первого ордера сетки по стандартному отклонению ====";
 extern ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
 extern int sdMaPeriod = 20; // Период
 int sdMaShift = 0; // Сдвиг
@@ -79,7 +85,7 @@ extern double sdLevel = 0.001; // Уровень для открытия орд�
 extern int sdBackPeriod = 6; // Исторический период
 extern double sdBackDiffCoef = 0.0006; // Историческая разница коеф.
 
-extern string _055 = "==== Определение первого ордера сетки по ADX ====";
+extern string _140 = "==== Определение первого ордера сетки по ADX ====";
 extern int adxPeriod = 14; // ADX - Period
 extern ENUM_APPLIED_PRICE adxAppliedPrice = PRICE_CLOSE; // ADX - Applied price
 extern int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
@@ -156,14 +162,18 @@ void OnTick()
             double profit = gm.GridProfit();
             if(gm.UpdateTrailing(profit, trailingStep))
               {
-               Print("Trailing updated");
+               Print("Trailing stop updated, profit: ", profit);
+               refillEnabled = false;
+               averagingEnabled = false;
                continue;
               }
 
             if(profit <= gm.GetTrailingStopLoss())
               {
-               Print("Profit reached by trailing stop");
+               Print("Trailing stop reached, profit: ", profit);
                gm.ResetTrailing();
+               refillEnabled = true;
+               averagingEnabled = true;
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
                continue;
@@ -185,11 +195,12 @@ void OnTick()
             Print("Close by loss");
             gm.CloseOrdersForGrid();
             gm.InitTicketsAndGrids();
-            continue;
            }
-
-         Print("Loss reached");
-         OpenOpositeOrder();
+         else
+           {
+            Print("Loss reached");
+            OpenOpositeOrder();
+           }
          continue;
         }
 
@@ -218,6 +229,20 @@ void OnTick()
         {
          Print("Can open SELL order - refill");
          gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill_SELL");
+         continue;
+        }
+
+      if(CanOpenAveragingOrder(OP_BUY))
+        {
+         Print("Can open BUY order - averaging");
+         gm.OpenOrder(OP_BUY, IncrementAndGetLots(averagingLotsCoef), "averaging_BUY");
+         continue;
+        }
+
+      if(CanOpenAveragingOrder(OP_SELL))
+        {
+         Print("Can open SELL order - averaging");
+         gm.OpenOrder(OP_SELL, IncrementAndGetLots(averagingLotsCoef), "averaging_SELL");
          continue;
         }
      }
@@ -279,7 +304,7 @@ bool IsLossReached()
       return false;
      }
 
-   int resolvedStopLoss = stopLoss != 0 ? stopLoss : takeProfit;
+   int resolvedStopLoss = stopLoss > 0 ? stopLoss : takeProfit;
    double proportionalStopLoss = resolvedStopLoss * currentLots / startLots; // Carefull (!)
    double stop = useProportionalStopLoss ? proportionalStopLoss : resolvedStopLoss;
 
@@ -378,7 +403,7 @@ bool CanOpenRefillOrder(int operation)
       trendLots += OrderLots(); // gather either BUY or SELL lots (!)
      }
 
-   if(trendLots * refillLotsCoef > maxGridRefillLots)
+   if(trendLots * refillLotsCoef > refillMaxLots)
      {
       return false;
      }
@@ -390,14 +415,94 @@ bool CanOpenRefillOrder(int operation)
      }
 
    double profit = OrderProfit() + OrderCommission() + OrderSwap();
-   double refillLevel = 1.0 * takeProfit / (refillCount + 1);
-   bool canRefill = refillCount > refills && profit > refillLevel * (refills + 1);
+   double level = 1.0 * takeProfit / (refillCount + 1);
+   bool canProceed = refillCount > refills && profit > level * (refills + 1);
 
-   if(operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask && canRefill)
+   if(canProceed && operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask)
      {
       return true;
      }
-   if(operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid && canRefill)
+   if(canProceed && operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid)
+     {
+      return true;
+     }
+
+   return false;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool CanOpenAveragingOrder(int operation)
+  {
+   if(!averagingEnabled || gm.GridOrdersCount() == 0)
+     {
+      return false;
+     }
+
+   double trendLots = 0;
+
+   int orderType = -1;
+   int averagings = 0;
+   int ticket = -1;
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return false;
+        }
+
+      if(orderType == -1) // define last order type
+        {
+         orderType = OrderType();
+        }
+      if(orderType != OrderType())
+        {
+         break;
+        }
+
+      if(StringFind(OrderComment(), "averaging") != -1)
+        {
+         averagings++;
+        }
+      else
+        {
+         ticket = OrderTicket(); // initial ticket in this direction
+        }
+
+      trendLots += OrderLots(); // gather either BUY or SELL lots (!)
+     }
+
+   if(trendLots * averagingLotsCoef > averagingMaxLots)
+     {
+      return false;
+     }
+
+   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
+     {
+      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+      return false;
+     }
+
+   double profit = OrderProfit() + OrderCommission() + OrderSwap();
+   if(profit >= 0)
+     {
+      return false;
+     }
+
+   int resolvedStopLoss = stopLoss > 0 ? stopLoss : takeProfit;
+   double proportionalStopLoss = resolvedStopLoss * currentLots / startLots; // Carefull (!)
+   double stop = useProportionalStopLoss ? proportionalStopLoss : resolvedStopLoss;
+   double level = 1.0 * stop / (averagingCount + 1);
+
+   bool canProceed = averagingCount > averagings && -1.0 * profit > level * (averagings + 1);
+
+   if(canProceed && operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() > Ask)
+     {
+      return true;
+     }
+   if(canProceed && operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() < Bid)
      {
       return true;
      }
