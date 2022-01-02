@@ -80,7 +80,8 @@ extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
-double currentLots;
+double currentLots = startLots;
+//double currentLots;
 int orderTickets[];
 GridManager *gm;
 
@@ -100,12 +101,19 @@ void OnTick()
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
-      currentLots = CurrentLots();
+      //currentLots = CurrentLots();
+
+      double cl = CurrentLots();
+      if(cl != currentLots)
+        {
+         Print("========================================", currentLots, " != ", cl);
+        }
 
       if(IsProfitReached())
         {
          Print("Profit reached");
          gm.CloseOrdersForGrid();
+         currentLots = startLots;
          continue;
         }
 
@@ -115,6 +123,7 @@ void OnTick()
            {
             Print("Close by loss");
             gm.CloseOrdersForGrid();
+            currentLots = startLots;
             continue;
            }
 
