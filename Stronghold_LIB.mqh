@@ -24,6 +24,8 @@ enum OrderField
 struct Grid
   {
    int               tickets[];
+   double            trailingTakeProfit; // trailing upper price level
+   double            trailingStopLoss; // trailing lower price level
   };
 
 //+------------------------------------------------------------------+
@@ -46,6 +48,9 @@ public:
    int               OpenOrder(int operation, double volume, string comment);
    double            LastOrderLotsForGrid(int gridIndex);
    bool              FirstOrderIsOpenedOnBar();
+   bool              UpdateTrailing(double profit, int step, int gridIndex);
+   double            GetTrailingStopLoss(int gridIndex);
+   void              ResetTrailing(int gridIndex);
 private:
    int               gridsCount;
    string            symbol;
@@ -555,5 +560,50 @@ bool GridManager::FirstOrderIsOpenedOnBar()
      }
 
    return false;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::UpdateTrailing(double profit, int step, int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   Grid grid = grids[resolvedGridIndex];
+
+   bool trailingNotInitialized = grid.trailingTakeProfit == 0 && grid.trailingStopLoss == 0;
+   bool trailingTakeProfitReached = profit >= grid.trailingTakeProfit + step;
+
+   if(trailingNotInitialized || trailingTakeProfitReached)
+     {
+      grid.trailingTakeProfit = profit + step;
+      grid.trailingStopLoss = profit - step;
+      return true;
+     }
+
+   return false;
+  }
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double GridManager::GetTrailingStopLoss(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   Grid grid = grids[resolvedGridIndex];
+
+   return grid.trailingStopLoss;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void GridManager::ResetTrailing(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   Grid grid = grids[resolvedGridIndex];
+
+   grid.trailingTakeProfit = 0;
+   grid.trailingStopLoss = 0;
   }
 //+------------------------------------------------------------------+

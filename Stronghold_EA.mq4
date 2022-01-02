@@ -33,6 +33,12 @@ extern int stopLoss = 10; // Убыток в валюте депозита пе�
 extern bool useProportionalStopLoss = true; // Использовать пропорциональный стоп-лосс от стартового лота
 extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
 
+extern string _021 = "==== Трейл ====";
+bool useTrailingStop = true;
+int trailingStep = 5;
+int trailUpStep = 5;
+int trailDownStep = 2;
+
 extern string _030 = "==== Доливка ====";
 extern bool refillEnabled = true; // Активировано?
 extern int refillCount = 10; // Количество доливок
@@ -91,6 +97,9 @@ double currentLots;
 int orderTickets[];
 GridManager *gm;
 
+double trailingTakeProfit = 0;
+double trailingStop = 0;
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -146,12 +155,47 @@ void OnTick()
       gm.GetNext(orderTickets);
       currentLots = CurrentLots();
 
+      // trail take profit
+      // trail stop loss
+
       if(IsProfitReached())
         {
-         Print("Profit reached");
-         gm.CloseOrdersForGrid();
-         gm.InitTicketsAndGrids();
-         continue;
+         if(useTrailingStop)
+           {
+            double profit = gm.GridProfit();
+
+            if(trailingTakeProfit == 0 && trailingStop == 0)
+              {
+               trailingTakeProfit = profit + trailUpStep;
+               trailingStop = profit - trailDownStep;
+               continue;
+              }
+
+            if(profit >= trailingTakeProfit + trailUpStep)
+              {
+               trailingTakeProfit = profit + trailUpStep;
+               trailingStop = profit - trailDownStep;
+               continue;
+              }
+
+            if(profit <= trailingStop)
+              {
+               trailingTakeProfit = 0;
+               trailingStop = 0;
+
+               Print("Profit reached by trail");
+               gm.CloseOrdersForGrid();
+               gm.InitTicketsAndGrids();
+               continue;
+              }
+           }
+         else
+           {
+            Print("Profit reached");
+            gm.CloseOrdersForGrid();
+            gm.InitTicketsAndGrids();
+            continue;
+           }
         }
 
       if(IsLossReached())
