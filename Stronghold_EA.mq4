@@ -39,7 +39,8 @@ extern bool recoveryEnabled = true; // Активировано?
 extern double recoveryLotsCoef = 2.5; // Шаг лота противоположного ордера
 extern int maxOpositeOrdersCountForDowngradeRecoveryLots = 4; // Количество опозитних ордеров перед понижением лота разрула
 extern double downgradeRecoveryLotsCoef = 0.1; // Коеф. пониженого лота разрула (1.0 + єто число)
-extern bool closeByLoss = false;
+extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования индикаторов)
+extern bool lockIfMaxOpositeOrdersReached = false; // Локировать сетку при макс. количестве опозитных ордеров
 
 input string _050 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
@@ -99,11 +100,23 @@ void OnTick()
      }
 
    gm = new GridManager(3, Symbol(), magic);
-   Comment(gm.GetStats());
+   Comment(gm.Stats());
 
    while(gm.HasNext())
      {
       gm.GetNext(orderTickets);
+
+      if(gm.GridIsLocked())
+        {
+         if(gm.GridProfit() >= 0)
+           {
+            Print("Closing grid");
+            gm.CloseOrdersForGrid();
+            ResetState();
+           }
+         currentLots = startLots; // (!)
+         continue;
+        }
 
       if(IsProfitReached())
         {
@@ -163,18 +176,18 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-int OrdersCount()
-  {
-   int result = ArraySize(orderTickets);
-   return result;
-  }
+//int OrdersCount()
+//  {
+//   int result = ArraySize(orderTickets);
+//   return result;
+//  }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool IsProfitReached()
   {
-   return gm.GetProfit() >= takeProfit;
+   return gm.TotalProfit() >= takeProfit;
   }
 
 //+------------------------------------------------------------------+
@@ -182,12 +195,12 @@ bool IsProfitReached()
 //+------------------------------------------------------------------+
 bool IsLossReached()
   {
-   if(!recoveryEnabled || OrdersCount() == 0)
+   if(!recoveryEnabled || gm.GridOrdersCount() == 0)
      {
       return false;
      }
 
-   if(!OrderSelect(orderTickets[OrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
+   if(!OrderSelect(orderTickets[gm.GridOrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
      {
       Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
       return false;
@@ -216,7 +229,7 @@ void ResetState()
 //+------------------------------------------------------------------+
 void OpenOpositeOrder()
   {
-   if(OrdersCount() == 0)
+   if(gm.GridOrdersCount() == 0)
      {
       return;
      }
@@ -224,7 +237,7 @@ void OpenOpositeOrder()
    int orderType = -1;
    double opositeLots = 0;
 
-   for(int i = OrdersCount() - 1; i >= 0; i--)
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
      {
       if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
         {
@@ -244,7 +257,7 @@ void OpenOpositeOrder()
      }
 
    int networkOpositeCount = 0;
-   for(int i = OrdersCount() - 1; i >= 0; i--)
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
      {
       if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
         {
@@ -262,24 +275,129 @@ void OpenOpositeOrder()
         }
      }
 
-   double lotsCoef = networkOpositeCount >= maxOpositeOrdersCountForDowngradeRecoveryLots
-                     ? (1.0 + networkOpositeCount * downgradeRecoveryLotsCoef)
-                     : recoveryLotsCoef;
+//double lotsCoef = networkOpositeCount >= maxOpositeOrdersCountForDowngradeRecoveryLots
+//                  ? (1.0 + networkOpositeCount * downgradeRecoveryLotsCoef)
+//                  : recoveryLotsCoef;
+
+   double lotsCoef = recoveryLotsCoef;
+   if(networkOpositeCount >= maxOpositeOrdersCountForDowngradeRecoveryLots)
+     {
+      if(lockIfMaxOpositeOrdersReached)
+        {
+         lotsCoef = 1.0; // lock
+        }
+      else
+        {
+         lotsCoef = 1.0 + networkOpositeCount * downgradeRecoveryLotsCoef;
+        }
+     }
 
 //Print("currentLots = ", currentLots, " opositeLots = ", opositeLots);
 //currentLots = IncrementLots(opositeLots, recoveryLotsCoef);
    currentLots = IncrementLots(opositeLots, lotsCoef);
 
+   string comment = lotsCoef == 1.0 ? "lock" : "oposite";
+
    switch(orderType)
      {
       case OP_BUY:
         {
-         gm.OpenOrder(OP_SELL, currentLots, "oposite SELL");
+         gm.OpenOrder(OP_SELL, currentLots, comment + "_SELL");
          break;
         }
       case OP_SELL:
         {
-         gm.OpenOrder(OP_BUY, currentLots, "oposite BUY");
+         gm.OpenOrder(OP_BUY, currentLots, comment + "_BUY");
+         break;
+        }
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OpenOpositeOrder2()
+  {
+   if(gm.GridOrdersCount() == 0)
+     {
+      return;
+     }
+
+   double buyLots = 0;
+   double sellLots = 0;
+   int networkOpositeCount = 0;
+
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return;
+        }
+
+      if(OrderType() == OP_BUY)
+        {
+         buyLots += OrderLots();
+        }
+      if(OrderType() == OP_SELL)
+        {
+         sellLots += OrderLots();
+        }
+      if(StringFind(OrderComment(), "oposite") != -1)
+        {
+         networkOpositeCount++;
+        }
+     }
+
+   double lotsCoef = recoveryLotsCoef;
+   if(networkOpositeCount >= maxOpositeOrdersCountForDowngradeRecoveryLots)
+     {
+      if(lockIfMaxOpositeOrdersReached)
+        {
+         // lock
+         gm.OpenOrder(OP_SELL, buyLots, "lock_SELL");
+         gm.OpenOrder(OP_BUY, sellLots, "lock_BUY");
+         return;
+        }
+      else
+        {
+         lotsCoef = 1.0 + networkOpositeCount * downgradeRecoveryLotsCoef;
+        }
+     }
+
+   int orderType = -1;
+   double opositeLots = 0;
+
+   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         return;
+        }
+
+      if(orderType == -1) // define last order type
+        {
+         orderType = OrderType();
+        }
+      if(orderType != OrderType())
+        {
+         break;
+        }
+      opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
+     }
+
+   currentLots = IncrementLots(opositeLots, lotsCoef);
+   switch(orderType)
+     {
+      case OP_BUY:
+        {
+         gm.OpenOrder(OP_SELL, currentLots, "oposite_SELL");
+         break;
+        }
+      case OP_SELL:
+        {
+         gm.OpenOrder(OP_BUY, currentLots, "oposite_BUY");
          break;
         }
      }
@@ -383,10 +501,7 @@ bool CanOpenFirstOrderByPreviousNetwork(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenFirstOrderMA(int operation)
   {
-   //RefreshRates();
-
-//if(gm.OrdersCount() > 0 || (gm.PrevOrdersCount() > 0 && !gm.PrevIsLocked()))
-   if(gm.OrdersCount() > 0)
+   if(gm.TotalOrdersCount() > 0 && (gm.GridOrdersCount() > 0 || !gm.PrevGridIsLocked()))
      {
       return false;
      }
@@ -538,12 +653,12 @@ bool CanOpenFirstOrderAdxOsMA(int operation)
 //+------------------------------------------------------------------+
 bool CanOpenRefillOrder(int operation)
   {
-   if(!refillEnabled || OrdersCount() == 0)
+   if(!refillEnabled || gm.GridOrdersCount() == 0)
      {
       return false;
      }
 
-   if(!OrderSelect(orderTickets[OrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
+   if(!OrderSelect(orderTickets[gm.GridOrdersCount() - 1], SELECT_BY_TICKET, MODE_TRADES))
      {
       Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
       return false;
