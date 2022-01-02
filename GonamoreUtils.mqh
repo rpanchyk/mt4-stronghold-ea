@@ -24,6 +24,7 @@ enum OrderField
 struct Grid
   {
    int               tickets[];
+   bool              locked;
   };
 
 //+------------------------------------------------------------------+
@@ -36,10 +37,17 @@ public:
    bool              HasNext();
    void              GetNext(int &out[]);
    void              CloseOrdersForGrid();
-   string            GetStats();
-   int               OrdersCount();
-   double            GetProfit();
+   string            Stats();
+   int               TotalOrdersCount();
+   int               GridOrdersCount(int gridIndex);
+   double            TotalProfit();
+   double            GridProfit(int gridIndex);
    int               OpenOrder(int operation, double volume, string comment);
+   bool              GridIsLocked(int gridIndex);
+   bool              IsLockUnbalance();
+   bool              PrevGridIsLocked();
+
+   // trash:
    int               PrevOrdersCount();
    bool              PrevIsLocked();
 private:
@@ -51,6 +59,7 @@ private:
 
    void              InitTickets(OrderField field, int &out[]);
    void              InitGrids(int gridCount);
+   int               GridsCount();
    bool              IsNotManagedOrder(string symbolName, int magicNumber);
    double            GetInProfit();
    double            GetInLoss();
@@ -73,15 +82,15 @@ GridManager::GridManager(int gridCount, string symbolName, int magicNumber)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool            GridManager::HasNext()
+bool GridManager::HasNext()
   {
-   return index < ArraySize(grids) - 1;
+   return index < GridsCount() - 1;
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void              GridManager::GetNext(int &out[])
+void GridManager::GetNext(int &out[])
   {
    index++;
 
@@ -97,7 +106,7 @@ void              GridManager::GetNext(int &out[])
 //+------------------------------------------------------------------+
 //| https://tlap.com/massivy-i-czikly/                               |
 //+------------------------------------------------------------------+
-void              GridManager::InitTickets(OrderField field, int &out[])
+void GridManager::InitTickets(OrderField field, int &out[])
   {
    int size = OrdersTotal();
    if(size == 0)
@@ -168,7 +177,7 @@ void              GridManager::InitTickets(OrderField field, int &out[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool              GridManager::IsNotManagedOrder(string symbolName, int magicNumber)
+bool GridManager::IsNotManagedOrder(string symbolName, int magicNumber)
   {
    return symbol != symbolName || magic != magicNumber;
   }
@@ -176,7 +185,7 @@ bool              GridManager::IsNotManagedOrder(string symbolName, int magicNum
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void             GridManager::InitGrids(int gridCount)
+void GridManager::InitGrids(int gridCount)
   {
    ArrayResize(grids, gridCount);
 
@@ -209,6 +218,64 @@ void             GridManager::InitGrids(int gridCount)
          grids[gridIndex].tickets[newSize - 1] = OrderTicket();
         }
      }
+
+   for(int gridIndex = 0; gridIndex < gridCount; gridIndex++)
+     {
+      Grid grid = grids[gridIndex];
+      int gridTicketsCount = ArraySize(grid.tickets);
+      //if(gridTicketsCount < 2)
+      //  {
+      //   continue;
+      //  }
+
+      for(int i = gridTicketsCount - 1; i >= 0; i--)
+        {
+         if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+           {
+            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+            return;
+           }
+
+         if(StringFind(OrderComment(), "lock") != -1)
+           {
+            grids[gridIndex].locked = true;
+            break;
+           }
+        }
+
+      //      for(int i = gridTicketsCount - 1; i >= 1; i--)
+      //        {
+      //         if(!OrderSelect(grid.tickets[i - 1], SELECT_BY_TICKET, MODE_TRADES))
+      //           {
+      //            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+      //            return;
+      //           }
+      //         int prevType = OrderType();
+      //         double prevLots = OrderLots();
+      //
+      //         if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+      //           {
+      //            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+      //            return;
+      //           }
+      //         int currType = OrderType();
+      //         double currLots = OrderLots();
+      //
+      //         if(currType != prevType && currLots == prevLots)
+      //           {
+      //            grids[gridIndex].locked = true;
+      //            break;
+      //           }
+      //        }
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int GridManager::GridsCount()
+  {
+   return ArraySize(grids);
   }
 
 //+------------------------------------------------------------------+
@@ -256,32 +323,75 @@ void GridManager::CloseOrdersForGrid()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-string GridManager::GetStats()
+string GridManager::Stats()
   {
-   if(OrdersCount() > 0)
+   if(TotalOrdersCount() > 0)
      {
-      string orderStats = "";
-      for(int i = 0; i < OrdersCount(); i++)
+      string gridStats = "";
+      for(int gridIndex = 0; gridIndex < GridsCount(); gridIndex++)
         {
-         if(!OrderSelect(sortedTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+         Grid grid = grids[gridIndex];
+
+         int ticketsCount = ArraySize(grid.tickets);
+         if(ticketsCount == 0)
            {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
+            continue;
            }
-         orderStats += "\n"
-                       + "  " + OrderComment() + ":"
-                       + " Profit: " + DoubleToString(OrderProfit(), 2)
-                       + " Commission: " + DoubleToString(OrderCommission(), 2)
-                       + " Swap: " + DoubleToString(OrderSwap(), 2)
-                       + " Lots: " + DoubleToString(OrderLots(), 2);
+
+         string gridOrderStats = "";
+         double gridProfit = 0;
+         for(int i = 0; i < ticketsCount; i++)
+           {
+            if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+              {
+               Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+               break;
+              }
+
+            gridOrderStats += "\n"
+                              + "    " + OrderComment() + ":"
+                              + " Profit: " + DoubleToString(OrderProfit(), 2)
+                              + " Commission: " + DoubleToString(OrderCommission(), 2)
+                              + " Swap: " + DoubleToString(OrderSwap(), 2)
+                              + " Lots: " + DoubleToString(OrderLots(), 2);
+
+            gridProfit += OrderProfit() + OrderCommission() + OrderSwap();
+           }
+
+         gridStats += "\n" + "  "
+                      + IntegerToString(gridIndex) + ":"
+                      + (grid.locked ? " LOCKED" : "")
+                      + " Profit: " + DoubleToString(gridProfit, 2)
+                      + "\n"
+                      + "  Orders (" + IntegerToString(ticketsCount) + "): " + gridOrderStats
+                      + "\n";
         }
 
-      return
-         "\n" + "Orders: " + orderStats +
-         "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0) +
-         "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0) +
-         "\n" + "Overall Profit: " + DoubleToString(GetProfit(), 0)
-         ;
+      //string orderStats = "";
+      //for(int i = 0; i < TotalOrdersCount(); i++)
+      //  {
+      //   if(!OrderSelect(sortedTickets[i], SELECT_BY_TICKET, MODE_TRADES))
+      //     {
+      //      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+      //      break;
+      //     }
+      //   orderStats += "\n"
+      //                 + "  " + OrderComment() + ":"
+      //                 + " Profit: " + DoubleToString(OrderProfit(), 2)
+      //                 + " Commission: " + DoubleToString(OrderCommission(), 2)
+      //                 + " Swap: " + DoubleToString(OrderSwap(), 2)
+      //                 + " Lots: " + DoubleToString(OrderLots(), 2);
+      //  }
+
+      return "\n"
+             + "Grids: " + gridStats
+             //+ "\n"
+             //+ "\n" + "Orders: " + orderStats
+             //+ "\n"
+             + "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0)
+             + "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0)
+             + "\n" + "Overall Profit: " + DoubleToString(TotalProfit(), 0)
+             ;
      }
    else
      {
@@ -292,10 +402,41 @@ string GridManager::GetStats()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-int GridManager::OrdersCount()
+double GridManager::GridProfit(int gridIndex = -1)
   {
-   int result = ArraySize(sortedTickets);
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   Grid grid = grids[resolvedGridIndex];
+   int ticketsCount = ArraySize(grid.tickets);
+
+   double result = 0;
+   for(int i = 0; i < ticketsCount; i++)
+     {
+      if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
+        {
+         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+         break;
+        }
+
+      result += OrderProfit() + OrderCommission() + OrderSwap();
+     }
    return result;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int GridManager::TotalOrdersCount()
+  {
+   return ArraySize(sortedTickets);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int GridManager::GridOrdersCount(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   return ArraySize(grids[resolvedGridIndex].tickets);
   }
 
 //+------------------------------------------------------------------+
@@ -304,9 +445,9 @@ int GridManager::OrdersCount()
 double GridManager::GetInProfit()
   {
    double result = 0;
-   if(OrdersCount() > 0)
+   if(TotalOrdersCount() > 0)
      {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
+      for(int i = TotalOrdersCount() - 1; i >= 0; i--)
         {
          if(!OrderSelect(sortedTickets[i], SELECT_BY_TICKET, MODE_TRADES))
            {
@@ -329,9 +470,9 @@ double GridManager::GetInProfit()
 double GridManager::GetInLoss()
   {
    double result = 0;
-   if(OrdersCount() > 0)
+   if(TotalOrdersCount() > 0)
      {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
+      for(int i = TotalOrdersCount() - 1; i >= 0; i--)
         {
          if(!OrderSelect(sortedTickets[i], SELECT_BY_TICKET, MODE_TRADES))
            {
@@ -351,12 +492,12 @@ double GridManager::GetInLoss()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-double GridManager::GetProfit()
+double GridManager::TotalProfit()
   {
    double result = 0;
-   if(OrdersCount() > 0)
+   if(TotalOrdersCount() > 0)
      {
-      for(int i = OrdersCount() - 1; i >= 0; i--)
+      for(int i = TotalOrdersCount() - 1; i >= 0; i--)
         {
          if(!OrderSelect(sortedTickets[i], SELECT_BY_TICKET, MODE_TRADES))
            {
@@ -409,7 +550,7 @@ int GridManager::OpenOrder(int operation, double volume, string comment)
 
          // update tickets info
          InitTickets(fOrderOpenTime, sortedTickets);
-         InitGrids(ArraySize(grids));
+         InitGrids(GridsCount());
 
          return ticket;
         }
@@ -445,7 +586,7 @@ int GridManager::PrevOrdersCount()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool              GridManager::PrevIsLocked()
+bool GridManager::PrevIsLocked()
   {
    if(index < 1)
      {
@@ -477,5 +618,36 @@ bool              GridManager::PrevIsLocked()
      }
 
    return false;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::GridIsLocked(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+   return grids[resolvedGridIndex].locked;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::IsLockUnbalance()
+  {
+   int result = 0;
+   for(int gridIndex = 0; gridIndex < GridsCount(); gridIndex++)
+     {
+      Grid grid = grids[gridIndex];
+      result += grid.locked ? 1 : -1;
+     }
+   return result > 0;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::PrevGridIsLocked()
+  {
+   return index > 0 && grids[index - 1].locked;
   }
 //+------------------------------------------------------------------+
