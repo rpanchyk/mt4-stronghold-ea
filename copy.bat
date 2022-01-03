@@ -3,10 +3,12 @@ setlocal
 
 @REM The script copies EA from MT4
 
-@REM Read properties in format:
+@REM Read options file having format:
 @REM BASE_PATH=C:\Users\[USER]\AppData\Roaming\MetaQuotes\Terminal\[TERMINAL_ID]
-@REM To see the path go to main menu "File -> Open Data Path" in MT4.
-for /f "delims== tokens=1,2" %%G in (copy_options.txt) do set %%G=%%H
+@REM To see the actual path go to main menu "File -> Open Data Path" in MT4.
+set OPTIONS_FILE=copy_options.txt
+if not exist %OPTIONS_FILE% echo Error: %OPTIONS_FILE% file not found && pause && exit 1
+for /f "delims== tokens=1,2" %%G in (%OPTIONS_FILE%) do set %%G=%%H
 
 @REM Settings
 set INCLUDE_DIR=MQL4\Include
