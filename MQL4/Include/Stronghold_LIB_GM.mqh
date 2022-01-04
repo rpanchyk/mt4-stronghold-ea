@@ -1,8 +1,10 @@
 //+------------------------------------------------------------------+
-//| Utils                                                            |
+//|                                            Stronghold_LIB_GM.mqh |
+//|                                             Grid Manager Library |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2020, GoNaMore"
-#property link      "https://github.com/gonamore"
+#property copyright   "Copyright 2020, FireTrot"
+#property link        "https://firetrot.com"
+#property description "Library serves series of grids"
 #property strict
 
 // constants

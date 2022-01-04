@@ -1,13 +1,15 @@
 //+------------------------------------------------------------------+
-//|               Forex Expert Adviser for MetaTrader4               |
-//|                The adviser serves series of grids                |
+//|                                                Stronghold_EA.mq4 |
+//|                                   Expert Adviser for MetaTrader4 |
 //+------------------------------------------------------------------+
-#property copyright  "Copyright 2020, GoNaMore"
-#property link       "https://github.com/gonamore"
-#property version    "1.4"
+#property copyright   "Copyright 2020, FireTrot"
+#property link        "https://firetrot.com"
+#property description "EA for automatic algorithmic trading"
+#property version     "1.5" // Should we care of version?
 #property strict
 
-#include <Stronghold_LIB.mqh>
+#include <Stronghold_LIB_TM.mqh>
+#include <Stronghold_LIB_ST.mqh>
 
 enum OPEN_FIRST_ORDER_BY // Определение первого ордера сетки
   {
@@ -18,41 +20,52 @@ enum OPEN_FIRST_ORDER_BY // Определение первого ордера �
    LEVEL_BREAKER // По пробитию уровней
   };
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class MovingAverageStrategy : public Strategy
+  {
+public:
+   virtual bool      CanOpenFirstOrder(int operation);
+  };
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class StochasticStrategy : public Strategy
+  {
+public:
+   virtual bool      CanOpenFirstOrder(int operation);
+  };
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class StandardDeviationStrategy : public Strategy
+  {
+public:
+   virtual bool      CanOpenFirstOrder(int operation);
+  };
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class AdxOsMAStrategy : public Strategy
+  {
+public:
+   virtual bool      CanOpenFirstOrder(int operation);
+  };
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+class LevelBreakerStrategy : public Strategy
+  {
+public:
+   virtual bool      CanOpenFirstOrder(int operation);
+  };
+
 // config
-extern string _010 = "==== Общие ====";
-extern int magic = 100; // Уникальный идентификатор инструмента
-extern bool isDryMode = false; // Режим "Сушка" (закрытие сеток)
-extern bool showStats = true; // Показывать статистику?
-extern int refreshStatsPeriod = 60; // Интервал обновления статистики (секунд)
-
-extern string _020 = "==== Торговля ====";
-extern double startLots = 0.01; // Стартовый лот
-extern double maxLots = 10.0; // Максимальный лот
-extern int takeProfit = 25; // Прибыль в валюте депозита
-extern int stopLoss = 0; // Убыток в валюте депозита перед разрулом (0 = прибыль)
-extern bool useProportionalStopLoss = true; // Использовать пропорциональный стоп-лосс от стартового лота
-extern int gridsCount = 1; // Количество сеток (зависит от типа определения первого ордера)
-
-extern string _021 = "==== Трейлинг-стоп ====";
-extern int trailingStep = 0; // Шаг трейла (вверх и вниз от текущего профита) (0 = выключен)
-
-extern string _030 = "==== Доливка ====";
-extern bool refillEnabled = true; // Активировано?
-extern int refillCount = 10; // Количество доливок
-extern double refillLotsCoef = 1.5; // Шаг лота доливки
-extern double refillMaxLots = 2; // Максимальный лот доливки
-
-extern string _040 = "==== Усреднение ====";
-extern bool averagingEnabled = true; // Активировано?
-extern int averagingCount = 10; // Количество усреднений
-extern double averagingLotsCoef = 1.5; // Шаг лота усреднения
-extern double averagingMaxLots = 2; // Максимальный лот усреднения
-
-extern string _050 = "==== Разрул ====";
-extern bool recoveryEnabled = true; // Активировано?
-extern double recoveryLotsCoef = 2.5; // Шаг лота противоположного ордера
-extern bool closeByLoss = false; // Закрывать ордера по стоп-лоссу (для тестирования)
-
 extern string _100 = "==== Определение первого ордера сетки ====";
 extern OPEN_FIRST_ORDER_BY openFirstOrderBy = MOVING_AVERAGE; // Стратегия открытия первого ордера
 
@@ -94,25 +107,39 @@ extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
-datetime lastOnTimerExecution;
-string stats;
-double currentLots;
-double currentProfit;
-int orderTickets[];
-GridManager *gm;
+Strategy *st;
+TradeManager *tm;
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   gm = new GridManager(Symbol(), magic, gridsCount);
-   EventSetTimer(refreshStatsPeriod);
-
-   if(IsTesting())
+   switch(openFirstOrderBy)
      {
-      OnTimer();
+      case MOVING_AVERAGE:
+         st = new MovingAverageStrategy();
+         break;
+      case STOCHASTIC:
+         st = new StochasticStrategy();
+         break;
+      case STANDARD_DEVIATION:
+         st = new StandardDeviationStrategy();
+         break;
+      case ADX_OSMA:
+         st = new AdxOsMAStrategy();
+         break;
+      case LEVEL_BREAKER:
+         st = new LevelBreakerStrategy();
+         break;
+      default:
+         Print(__FUNCTION__, ": ", "Unknown openning first order type: ", openFirstOrderBy);
+         return;
      }
+
+   tm = new TradeManager(Symbol(), IsTesting(), st);
+
+   EventSetTimer(tm.GetRefreshStatsPeriod());
   }
 
 //+------------------------------------------------------------------+
@@ -121,7 +148,11 @@ void OnInit()
 void OnDeinit(const int reason)
   {
    EventKillTimer();
-   delete gm;
+
+   tm.OnDeinitExecution(reason);
+
+   delete st;
+   delete tm;
   }
 
 //+------------------------------------------------------------------+
@@ -129,8 +160,7 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   stats = showStats ? gm.Stats() : "";
-   lastOnTimerExecution = TimeCurrent();
+   tm.OnTimerExecution();
   }
 
 //+------------------------------------------------------------------+
@@ -138,409 +168,17 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   if(!IsTradeAllowed())
-     {
-      return;
-     }
+   tm.OnTickExecution();
 
-   if(IsTesting() && TimeCurrent() > lastOnTimerExecution + refreshStatsPeriod)
-     {
-      OnTimer();
-     }
-
-   Comment(stats);
-   gm.ResetPosition();
-
-   while(gm.HasNext())
-     {
-      gm.GetNext(orderTickets);
-      currentLots = CurrentLots();
-      currentProfit = gm.GridProfit();
-
-      if(IsProfitReached())
-        {
-         if(trailingStep > 0)
-           {
-            if(gm.UpdateTrailing(currentProfit, trailingStep))
-              {
-               Print("Trailing stop updated, profit: ", currentProfit);
-               continue;
-              }
-
-            if(currentProfit <= gm.GetTrailingStopLoss())
-              {
-               Print("Trailing stop reached, profit: ", currentProfit);
-               gm.ResetTrailing();
-               gm.CloseOrdersForGrid();
-               gm.InitTicketsAndGrids();
-               continue;
-              }
-           }
-         else
-           {
-            Print("Profit reached");
-            gm.CloseOrdersForGrid();
-            gm.InitTicketsAndGrids();
-            continue;
-           }
-        }
-
-      if(IsLossReached())
-        {
-         if(closeByLoss)
-           {
-            Print("Close by loss");
-            gm.CloseOrdersForGrid();
-            gm.InitTicketsAndGrids();
-           }
-         else
-           {
-            Print("Loss reached");
-            OpenOpositeOrder();
-           }
-         continue;
-        }
-
-      if(CanOpenFirstOrder(OP_BUY))
-        {
-         Print("Can open BUY order");
-         gm.OpenOrder(OP_BUY, currentLots, "first_BUY");
-         continue;
-        }
-
-      if(CanOpenFirstOrder(OP_SELL))
-        {
-         Print("Can open SELL order");
-         gm.OpenOrder(OP_SELL, currentLots, "first_SELL");
-         continue;
-        }
-
-      if(CanOpenRefillOrder(OP_BUY))
-        {
-         Print("Can open BUY order - refill");
-         gm.OpenOrder(OP_BUY, IncrementAndGetLots(refillLotsCoef), "refill_BUY");
-         continue;
-        }
-
-      if(CanOpenRefillOrder(OP_SELL))
-        {
-         Print("Can open SELL order - refill");
-         gm.OpenOrder(OP_SELL, IncrementAndGetLots(refillLotsCoef), "refill_SELL");
-         continue;
-        }
-
-      if(CanOpenAveragingOrder(OP_BUY))
-        {
-         Print("Can open BUY order - averaging");
-         gm.OpenOrder(OP_BUY, IncrementAndGetLots(averagingLotsCoef), "averaging_BUY");
-         continue;
-        }
-
-      if(CanOpenAveragingOrder(OP_SELL))
-        {
-         Print("Can open SELL order - averaging");
-         gm.OpenOrder(OP_SELL, IncrementAndGetLots(averagingLotsCoef), "averaging_SELL");
-         continue;
-        }
-     }
+   Comment(tm.GetStats());
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-double CurrentLots()
+bool MovingAverageStrategy::CanOpenFirstOrder(int operation)
   {
-   double lastLots = gm.LastOrderLotsForGrid();
-   return lastLots != 0 ? lastLots : startLots;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-double IncrementAndGetLots(double coef)
-  {
-   currentLots = IncrementLots(currentLots, coef);
-   return currentLots;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-double IncrementLots(double value, double coef)
-  {
-   double result = MathMin(value * coef, maxLots);
-   result *= 100;
-   result = MathRound(result);
-   result /= 100;
-   return NormalizeDouble(result, 2);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool IsProfitReached()
-  {
-   return currentProfit >= takeProfit + trailingStep;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool IsLossReached()
-  {
-   int gridOrdersCount = gm.GridOrdersCount();
-
-   if(!recoveryEnabled || gridOrdersCount == 0 || currentProfit > 0)
-     {
-      return false;
-     }
-
-   if(!OrderSelect(orderTickets[gridOrdersCount - 1], SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return false;
-     }
-
-   int resolvedStopLoss = stopLoss > 0 ? stopLoss : takeProfit;
-   double proportionalStopLoss = resolvedStopLoss * currentLots / startLots; // Carefull (!)
-   double stop = useProportionalStopLoss ? proportionalStopLoss : resolvedStopLoss;
-
-   return OrderProfit() + OrderCommission() + OrderSwap() < stop * -1;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void OpenOpositeOrder()
-  {
-   if(gm.GridOrdersCount() == 0)
-     {
-      return;
-     }
-
-   int orderType = -1;
-   double opositeLots = 0;
-   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return;
-        }
-
-      if(orderType == -1) // define last order type
-        {
-         orderType = OrderType();
-        }
-      if(orderType != OrderType())
-        {
-         break;
-        }
-      opositeLots += OrderLots(); // gather either BUY or SELL lots (!)
-     }
-
-   currentLots = IncrementLots(opositeLots, recoveryLotsCoef);
-
-   switch(orderType)
-     {
-      case OP_BUY:
-        {
-         gm.OpenOrder(OP_SELL, currentLots, "oposite_SELL");
-         break;
-        }
-      case OP_SELL:
-        {
-         gm.OpenOrder(OP_BUY, currentLots, "oposite_BUY");
-         break;
-        }
-     }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenRefillOrder(int operation)
-  {
-   if(!refillEnabled || gm.GridOrdersCount() == 0 || gm.GetTrailingStopLoss() > 0)
-     {
-      return false;
-     }
-
-   double trendLots = 0;
-
-   int orderType = -1;
-   int refills = 0;
-   int ticket = -1;
-   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return false;
-        }
-
-      if(orderType == -1) // define last order type
-        {
-         orderType = OrderType();
-        }
-      if(orderType != OrderType())
-        {
-         break;
-        }
-
-      if(StringFind(OrderComment(), "refill") != -1)
-        {
-         refills++;
-        }
-      else
-        {
-         ticket = OrderTicket(); // initial ticket in this direction
-        }
-
-      trendLots += OrderLots(); // gather either BUY or SELL lots (!)
-     }
-
-   if(trendLots * refillLotsCoef > refillMaxLots)
-     {
-      return false;
-     }
-
-   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return false;
-     }
-
-   double profit = OrderProfit() + OrderCommission() + OrderSwap();
-   double level = 1.0 * takeProfit / (refillCount + 1);
-   bool canProceed = refillCount > refills && profit > level * (refills + 1);
-
-   if(canProceed && operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() < Ask)
-     {
-      return true;
-     }
-   if(canProceed && operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() > Bid)
-     {
-      return true;
-     }
-
-   return false;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenAveragingOrder(int operation)
-  {
-   if(!averagingEnabled || gm.GridOrdersCount() == 0 || gm.GetTrailingStopLoss() > 0)
-     {
-      return false;
-     }
-
-   double trendLots = 0;
-
-   int orderType = -1;
-   int averagings = 0;
-   int ticket = -1;
-   for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
-     {
-      if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
-        {
-         Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-         return false;
-        }
-
-      if(orderType == -1) // define last order type
-        {
-         orderType = OrderType();
-        }
-      if(orderType != OrderType())
-        {
-         break;
-        }
-
-      if(StringFind(OrderComment(), "averaging") != -1)
-        {
-         averagings++;
-        }
-      else
-        {
-         ticket = OrderTicket(); // initial ticket in this direction
-        }
-
-      trendLots += OrderLots(); // gather either BUY or SELL lots (!)
-     }
-
-   if(trendLots * averagingLotsCoef > averagingMaxLots)
-     {
-      return false;
-     }
-
-   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
-     {
-      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-      return false;
-     }
-
-   double profit = OrderProfit() + OrderCommission() + OrderSwap();
-   if(profit >= 0)
-     {
-      return false;
-     }
-
-   int resolvedStopLoss = stopLoss > 0 ? stopLoss : takeProfit;
-   double proportionalStopLoss = resolvedStopLoss * currentLots / startLots; // Carefull (!)
-   double stop = useProportionalStopLoss ? proportionalStopLoss : resolvedStopLoss;
-   double level = 1.0 * stop / (averagingCount + 1);
-
-   bool canProceed = averagingCount > averagings && -1.0 * profit > level * (averagings + 1);
-
-   if(canProceed && operation == OP_BUY && OrderType() == OP_BUY && OrderOpenPrice() > Ask)
-     {
-      return true;
-     }
-   if(canProceed && operation == OP_SELL && OrderType() == OP_SELL && OrderOpenPrice() < Bid)
-     {
-      return true;
-     }
-
-   return false;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenFirstOrder(int operation)
-  {
-   if(isDryMode || gm.GridOrdersCount() > 0 || gm.FirstOrderIsOpenedOnBar())
-     {
-      return false;
-     }
-
-   switch(openFirstOrderBy)
-     {
-      case MOVING_AVERAGE:
-         return CanOpenFirstOrderByMmovingAverage(operation);
-      case STOCHASTIC:
-         return CanOpenFirstOrderByStochastic(operation);
-      case STANDARD_DEVIATION:
-         return CanOpenFirstOrderStandardDeviation(operation);
-      case ADX_OSMA:
-         return CanOpenFirstOrderAdxOsMA(operation);
-      case LEVEL_BREAKER:
-         return CanOpenFirstOrderByLevelBreaker(operation);
-      default:
-         Print(__FUNCTION__, ": ", "Unknown openning first order type: ", openFirstOrderBy);
-         return false;
-     }
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool CanOpenFirstOrderByMmovingAverage(int operation)
-  {
-   if(gm.TotalOrdersCount() > 0) // only one grid is allowed
+   if(tm.TotalOrdersCount() > 0) // only one grid is allowed
      {
       return false;
      }
@@ -574,7 +212,7 @@ bool CanOpenFirstOrderByMmovingAverage(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderByStochastic(int operation)
+bool StochasticStrategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {
@@ -593,7 +231,7 @@ bool CanOpenFirstOrderByStochastic(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderStandardDeviation(int operation)
+bool StandardDeviationStrategy::CanOpenFirstOrder(int operation)
   {
 //double prevLevel = iStdDev(Symbol(), sdTimeframe, sdMaPeriod, sdMaShift, sdMaMethod, sdAppliedPrice, 1);
 //double currLevel = iStdDev(Symbol(), sdTimeframe, sdMaPeriod, sdMaShift, sdMaMethod, sdAppliedPrice, 0);
@@ -658,7 +296,7 @@ bool CanOpenFirstOrderStandardDeviation(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderAdxOsMA(int operation)
+bool AdxOsMAStrategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {
@@ -690,7 +328,7 @@ bool CanOpenFirstOrderAdxOsMA(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CanOpenFirstOrderByLevelBreaker(int operation)
+bool LevelBreakerStrategy::CanOpenFirstOrder(int operation)
   {
    if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
      {
