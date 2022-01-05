@@ -334,8 +334,7 @@ string GridManager::Stats()
              + "Grids: " + gridStats
              + "\n" + "In Profit: " + DoubleToString(GetInProfit(), 0)
              + "\n" + "In Loss: " + DoubleToString(GetInLoss(), 0)
-             + "\n" + "Overall Profit: " + DoubleToString(TotalProfit(), 0)
-             ;
+             + "\n" + "Overall Profit: " + DoubleToString(TotalProfit(), 0);
      }
    else
      {
@@ -517,22 +516,22 @@ double GridManager::LastOrderLotsForGrid(int gridIndex = -1)
   {
    int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
    Grid grid = grids[resolvedGridIndex];
+
    int ticketsCount = GridOrdersCount(resolvedGridIndex);
-
-   if(ticketsCount > 0)
+   if(ticketsCount <= 0)
      {
-      for(int i = ticketsCount - 1; i >= 0 ; i--)
-        {
-         if(!OrderSelect(grid.tickets[i], SELECT_BY_TICKET, MODE_TRADES))
-           {
-            Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
-            break;
-           }
-
-         return OrderLots();
-        }
+      return 0;
      }
-   return 0;
+
+   if(OrderSelect(grid.tickets[ticketsCount - 1], SELECT_BY_TICKET, MODE_TRADES))
+     {
+      return OrderLots();
+     }
+   else
+     {
+      Print(__FUNCTION__, ": ", "Unable to select the order: ", GetLastError());
+      return 0;
+     }
   }
 
 //+------------------------------------------------------------------+

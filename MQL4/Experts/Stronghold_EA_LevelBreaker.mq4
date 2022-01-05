@@ -29,7 +29,7 @@ TradeManager *tm;
 void OnInit()
   {
    st = new LevelBreakerStrategy();
-   tm = new TradeManager(Symbol(), IsTesting(), st);
+   tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
   }

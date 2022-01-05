@@ -51,7 +51,7 @@ extern bool closeByLoss = false; // Закрывать ордера по сто�
 class TradeManager
   {
 public:
-                     TradeManager(string inSymbol, bool inIsTesting, Strategy *inStrategy);
+                     TradeManager(string inSymbol, int inPeriod, bool inIsTesting, Strategy *inStrategy);
 
    void              OnTimerExecution();
    void              OnTickExecution();
@@ -59,9 +59,11 @@ public:
 
    int               GetRefreshStatsPeriod();
    string            GetStats();
-   int               TotalOrdersCount(); // wrongly used by MA only. Remove?
+   int               TotalOrdersCount(); // TODO: wrongly used by MA only. Remove?
 private:
-   bool              isTesting;
+   string            symbol;
+   int               period;
+   datetime          lastBarTime;
    double            currentLots;
    double            currentProfit;
    int               orderTickets[];
@@ -70,6 +72,7 @@ private:
    GridManager       *gm;
    Strategy          *st;
 
+   bool              IsNewBar();
    void              OpenOpositeOrder();
    bool              CanOpenRefillOrder(int operation);
    bool              IsProfitReached();
@@ -84,13 +87,15 @@ private:
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-TradeManager::TradeManager(string inSymbol, bool inIsTesting, Strategy *inStrategy)
+TradeManager::TradeManager(string inSymbol, int inPeriod, bool inIsTesting, Strategy *inStrategy)
   {
-   gm = new GridManager(inSymbol, magic, gridsCount);
+   symbol = inSymbol;
+   period = inPeriod;
+
+   gm = new GridManager(symbol, magic, gridsCount);
 
    if(inIsTesting)
      {
-      isTesting = true;
       OnTimerExecution();
      }
 
@@ -111,6 +116,11 @@ void TradeManager::OnTimerExecution()
 //+------------------------------------------------------------------+
 void TradeManager::OnTickExecution()
   {
+   if(!IsNewBar())
+     {
+      return;
+     }
+
    if(!IsTradeAllowed())
      {
       return;
@@ -215,6 +225,21 @@ void TradeManager::OnTickExecution()
          continue;
         }
      }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool TradeManager::IsNewBar()
+  {
+   datetime currentBarTime = iTime(symbol, period, 0);
+   if(lastBarTime != currentBarTime)
+     {
+      lastBarTime = currentBarTime;
+      return true;
+     }
+
+   return false;
   }
 
 //+------------------------------------------------------------------+
