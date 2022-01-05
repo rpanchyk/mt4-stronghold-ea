@@ -37,4 +37,4 @@ if exist "%DATA_DIR%\%INDICATORS_DIR%\AdxCrossingOsMA_INGM.mq4" copy /Y "%DATA_D
 if exist "%DATA_DIR%\%INDICATORS_DIR%\LevelBreaker_IND.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\LevelBreaker_IND.mq4" "%INDICATORS_DIR%"
 
 echo Successfully copied.
-pause
+timeout /t 5
