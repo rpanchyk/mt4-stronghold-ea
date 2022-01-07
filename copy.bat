@@ -29,14 +29,14 @@ if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA.mq4" copy /Y "%DATA_DIR%\%EXPER
 if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_AdxOsMA.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_AdxOsMA.mq4" "%EXPERTS_DIR%"
 if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_LevelBreaker.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_LevelBreaker.mq4" "%EXPERTS_DIR%"
 if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_MovingAverage.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_MovingAverage.mq4" "%EXPERTS_DIR%"
-if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_QuantumShaolin.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_QuantumShaolin.mq4" "%EXPERTS_DIR%"
+if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_Quantum.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_Quantum.mq4" "%EXPERTS_DIR%"
 if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_StandardDeviation.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_StandardDeviation.mq4" "%EXPERTS_DIR%"
 if exist "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_Stochastic.mq4" copy /Y "%DATA_DIR%\%EXPERTS_DIR%\Stronghold_EA_Stochastic.mq4" "%EXPERTS_DIR%"
 
 if exist "%DATA_DIR%\%INDICATORS_DIR%\AdxCrossing_INGM.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\AdxCrossing_INGM.mq4" "%INDICATORS_DIR%"
 if exist "%DATA_DIR%\%INDICATORS_DIR%\AdxCrossingOsMA_INGM.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\AdxCrossingOsMA_INGM.mq4" "%INDICATORS_DIR%"
 if exist "%DATA_DIR%\%INDICATORS_DIR%\LevelBreaker_IND.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\LevelBreaker_IND.mq4" "%INDICATORS_DIR%"
-if exist "%DATA_DIR%\%INDICATORS_DIR%\QuantumShaolin_IND.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\QuantumShaolin_IND.mq4" "%INDICATORS_DIR%"
+if exist "%DATA_DIR%\%INDICATORS_DIR%\Quantum_IND.mq4" copy /Y "%DATA_DIR%\%INDICATORS_DIR%\Quantum_IND.mq4" "%INDICATORS_DIR%"
 
 echo Successfully copied.
 timeout /t 5

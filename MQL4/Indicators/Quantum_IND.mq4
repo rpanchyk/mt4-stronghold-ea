@@ -1,17 +1,21 @@
 //+------------------------------------------------------------------+
-//|                                         Quantum Signal Indicator |
-//|                                    Based on 'Quantum Signal.mq4' |
-//|                                           since 2021 by Ludaedfx |
+//|                                                Quantum Indicator |
+//|                                         Copyright 2021, FireTrot |
+//|                              Based on 'Quantum.mq4' 2010, zznbrm |
 //+------------------------------------------------------------------+
-#property copyright   "Ludaedfx"
+#property copyright   "Copyright 2020, FireTrot"
+#property link        "https://firetrot.com"
 #property description "Indicator shows possible trade entry points"
-#property version     "1.2"
 //#property strict
 
 #property indicator_chart_window
-#property indicator_buffers 2
 #property indicator_color1 clrLime
 #property indicator_color2 clrRed
+#property indicator_buffers 2
+
+// buffers
+double buyBuffer[];
+double sellBuffer[];
 
 // settings
 extern int arrowSize = 3;
@@ -23,11 +27,6 @@ extern double signalGap = 0.5;
 
 // input parameters
 extern int eintDepth3 = 300;
-
-// runtime
-datetime TimeBar;
-double buyBuffer[];
-double sellBuffer[];
 
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
@@ -48,7 +47,7 @@ int init()
    SetIndexLabel(1, NULL);
 
    IndicatorDigits(5);
-   IndicatorShortName("Quantum Signal");
+   IndicatorShortName("Quantum");
 
    return 0;
   }

@@ -76,9 +76,9 @@ bool QuantumSignalStrategy::CanOpenFirstOrder(int operation)
    switch(operation)
      {
       case OP_BUY:
-         return iCustom(Symbol(), 0, "QuantumShaolin_IND", 0, 0) > 0;
+         return iCustom(Symbol(), 0, "Quantum_IND", 0, 0) > 0;
       case OP_SELL:
-         return iCustom(Symbol(), 0, "QuantumShaolin_IND", 1, 0) > 0;
+         return iCustom(Symbol(), 0, "Quantum_IND", 1, 0) > 0;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
