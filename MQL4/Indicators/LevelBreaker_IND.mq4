@@ -40,7 +40,7 @@ int init()
    IndicatorBuffers(7);
 
    SetIndexBuffer(0, Resistance);
-   SetIndexStyle(0, DRAW_LINE, STYLE_SOLID, 2, clrDarkGreen);
+   SetIndexStyle(0, DRAW_LINE, STYLE_SOLID, 2, clrGreen);
    SetIndexLabel(0, "Resistance");
    SetIndexDrawBegin(0, 25);
 
@@ -50,13 +50,19 @@ int init()
    SetIndexDrawBegin(1, 25);
 
    SetIndexBuffer(2, SR_Mean);
-   SetIndexStyle(2, DRAW_LINE, STYLE_DOT, 1, clrDarkGoldenrod);
+   SetIndexStyle(2, DRAW_LINE, STYLE_DOT, 1, clrGoldenrod);
    SetIndexLabel(2, "S/R_Mean");
    SetIndexDrawBegin(2, 25);
 
    SetIndexBuffer(3, HLC3);
+   SetIndexStyle(3, DRAW_LINE, STYLE_SOLID, 1, clrCyan);
+   SetIndexLabel(3, "HLC3");
+   SetIndexDrawBegin(3, 25);
 
    SetIndexBuffer(4, MAOnArray);
+   SetIndexStyle(4, DRAW_LINE, STYLE_SOLID, 1, clrLightPink);
+   SetIndexLabel(4, "MAs");
+   SetIndexDrawBegin(4, 25);
 
    SetIndexBuffer(5, buyBuffer);
    SetIndexStyle(5, DRAW_ARROW, EMPTY, 1, clrLime);
@@ -97,7 +103,7 @@ int OnCalculate(const int rates_total,
       return -1;
      }
 
-   int availableBars = minRequiredBars;
+   int availableBars = Bars - counted_bars;
 
    for(int j = 0; j < availableBars; j++)
      {

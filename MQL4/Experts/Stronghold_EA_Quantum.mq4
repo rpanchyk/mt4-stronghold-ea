@@ -13,22 +13,14 @@
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-class StochasticStrategy : public Strategy
+class QuantumSignalStrategy : public Strategy
   {
 public:
    virtual bool      CanOpenFirstOrder(int operation);
   };
 
 // config
-extern string _100 = "==== Определение первого ордера сетки по стохе ====";
-extern ENUM_TIMEFRAMES stochTimeframe = PERIOD_M1; // Таймфрейм
-extern int stochKperiod = 11; // K-период
-extern int stochDperiod = 16; // D-период
-extern int stochSlowing = 13; // Замедление
-extern ENUM_MA_METHOD stochMaMethod = MODE_SMA; // Метод MA
-extern ENUM_STO_PRICE stochPrice = STO_LOWHIGH; // Цена
-extern double stochUpLevel = 95.0; // Верхний уровень
-extern double stochDownLevel = 5.0; // Нижний уровень
+// ...
 
 // runtime
 Strategy *st;
@@ -39,7 +31,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new StochasticStrategy();
+   st = new QuantumSignalStrategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -79,16 +71,14 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool StochasticStrategy::CanOpenFirstOrder(int operation)
+bool QuantumSignalStrategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {
       case OP_BUY:
-         return iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 2) <= stochDownLevel
-                && iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 1) > stochDownLevel;
+         return iCustom(Symbol(), 0, "QuantumSignal_IND", 0, 0) > 0;
       case OP_SELL:
-         return iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 2) >= stochUpLevel
-                && iStochastic(Symbol(), stochTimeframe, stochKperiod, stochDperiod, stochSlowing, stochMaMethod, 0, 0, 1) < stochUpLevel;
+         return iCustom(Symbol(), 0, "QuantumSignal_IND", 1, 0) > 0;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;

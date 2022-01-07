@@ -70,10 +70,10 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool LevelBreakerStrategy::CanOpenFirstOrder(int operation)
   {
-   if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
-     {
-      return false;
-     }
+   //if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
+   //  {
+   //   return false;
+   //  }
 
    switch(operation)
      {
