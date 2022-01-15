@@ -13,14 +13,19 @@
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-class QuantumSignalStrategy : public Strategy
+class CustomStrategy : public Strategy
   {
 public:
    virtual bool      CanOpenFirstOrder(int operation);
   };
 
 // config
-// ...
+input string _100 = "==== Quantum with filter by MACD ====";
+input int quantumPeriod = 8;
+input int macdFastEmaPeriod = 5;
+input int macdSlowEmaPeriod = 14;
+input int macdSignalPeriod = 6;
+input ENUM_APPLIED_PRICE macdAppliedPrice = PRICE_TYPICAL;
 
 // runtime
 Strategy *st;
@@ -31,7 +36,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new QuantumSignalStrategy();
+   st = new CustomStrategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -71,17 +76,25 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool QuantumSignalStrategy::CanOpenFirstOrder(int operation)
+bool CustomStrategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {
       case OP_BUY:
-         return iCustom(Symbol(), 0, "Quantum_IND", 0, 0) > 0;
+         return CustomIndicator(0) > 0;
       case OP_SELL:
-         return iCustom(Symbol(), 0, "Quantum_IND", 1, 0) > 0;
+         return CustomIndicator(1) > 0;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
      }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double CustomIndicator(int buffer)
+  {
+   return iCustom(Symbol(), Period(), "QuantumWithFilter_IND", "", quantumPeriod, "", macdFastEmaPeriod, macdSlowEmaPeriod, macdSignalPeriod, buffer, 0);
   }
 //+------------------------------------------------------------------+
