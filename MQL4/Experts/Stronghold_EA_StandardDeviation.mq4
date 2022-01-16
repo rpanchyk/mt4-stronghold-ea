@@ -27,7 +27,6 @@ input int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
 input ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
-Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
@@ -35,8 +34,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), st);
+   tm = new TradeManager(Symbol(), Period());
   }
 
 //+------------------------------------------------------------------+
@@ -45,7 +43,6 @@ void OnInit()
 void OnDeinit(const int reason)
   {
    delete tm;
-   delete st;
   }
 
 //+------------------------------------------------------------------+

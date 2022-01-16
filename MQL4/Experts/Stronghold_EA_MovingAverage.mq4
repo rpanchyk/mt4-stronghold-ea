@@ -20,7 +20,6 @@ input ENUM_APPLIED_PRICE maAppliedPrice = PRICE_MEDIAN; // Применяема�
 input int maBackToHistory = 10; // Назад в историю для определения тренда
 
 // runtime
-Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
@@ -28,8 +27,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), st);
+   tm = new TradeManager(Symbol(), Period());
   }
 
 //+------------------------------------------------------------------+
@@ -38,7 +36,6 @@ void OnInit()
 void OnDeinit(const int reason)
   {
    delete tm;
-   delete st;
   }
 
 //+------------------------------------------------------------------+

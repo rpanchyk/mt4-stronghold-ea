@@ -11,7 +11,6 @@
 #include <Stronghold_LIB_ST.mqh>
 
 // runtime
-Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
@@ -19,8 +18,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), st);
+   tm = new TradeManager(Symbol(), Period());
   }
 
 //+------------------------------------------------------------------+
@@ -29,7 +27,6 @@ void OnInit()
 void OnDeinit(const int reason)
   {
    delete tm;
-   delete st;
   }
 
 //+------------------------------------------------------------------+

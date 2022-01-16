@@ -19,7 +19,6 @@ input int macdSignalPeriod = 6;
 input ENUM_APPLIED_PRICE macdAppliedPrice = PRICE_TYPICAL;
 
 // runtime
-Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
@@ -27,8 +26,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), st);
+   tm = new TradeManager(Symbol(), Period());
   }
 
 //+------------------------------------------------------------------+
@@ -37,7 +35,6 @@ void OnInit()
 void OnDeinit(const int reason)
   {
    delete tm;
-   delete st;
   }
 
 //+------------------------------------------------------------------+

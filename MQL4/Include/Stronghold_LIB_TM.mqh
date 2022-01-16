@@ -59,7 +59,7 @@ extern bool closeByLoss = false; // Закрывать ордера по сто�
 class TradeManager
   {
 public:
-                     TradeManager(string inSymbol, int inPeriod, Strategy *inStrategy);
+                     TradeManager(string inSymbol, int inPeriod);
                     ~TradeManager();
 
    void              OnTickExecution();
@@ -97,11 +97,12 @@ private:
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-TradeManager::TradeManager(string inSymbol, int inPeriod, Strategy *inStrategy)
+TradeManager::TradeManager(string inSymbol, int inPeriod)
   {
    symbol = inSymbol;
    period = inPeriod;
-   st = inStrategy;
+
+   st = new Strategy();
    gm = new GridManager(symbol, magic, gridsCount);
   }
 
@@ -111,6 +112,7 @@ TradeManager::TradeManager(string inSymbol, int inPeriod, Strategy *inStrategy)
 void TradeManager::~TradeManager()
   {
    delete gm;
+   delete st;
   }
 
 //+------------------------------------------------------------------+
