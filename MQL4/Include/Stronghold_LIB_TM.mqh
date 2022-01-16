@@ -10,14 +10,22 @@
 #include <Stronghold_LIB_GM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
+enum TRADE_ON
+  {
+   TRADE_ON_TICK, // Каждый тик
+   TRADE_ON_BAR, // Новый бар
+   TRADE_ON_TIMER // По таймеру
+  };
+
 // config
 extern string _010 = "==== Общие ====";
 extern int magic = 100; // Уникальный идентификатор инструмента
 extern bool dryModeEnabled = false; // Режим "Сушка" (закрытие сеток)
 extern bool showStats = true; // Показывать статистику?
-extern int refreshStatsPeriod = 60; // Интервал обновления статистики (секунд)
 
 extern string _020 = "==== Торговля ====";
+extern TRADE_ON tradeOn = TRADE_ON_BAR; // Как торговать?
+extern int timerInterval = 60; // Интервал таймера (секунд)
 extern double startLots = 0.01; // Стартовый лот
 extern double maxLots = 10.0; // Максимальный лот
 extern int takeProfit = 25; // Прибыль в валюте депозита
@@ -51,13 +59,11 @@ extern bool closeByLoss = false; // Закрывать ордера по сто�
 class TradeManager
   {
 public:
-                     TradeManager(string inSymbol, int inPeriod, bool inIsTesting, Strategy *inStrategy);
+                     TradeManager(string inSymbol, int inPeriod, Strategy *inStrategy);
+                    ~TradeManager();
 
-   void              OnTimerExecution();
    void              OnTickExecution();
-   void              OnDeinitExecution(int reason);
 
-   int               GetRefreshStatsPeriod();
    string            GetStats();
    int               TotalOrdersCount(); // TODO: wrongly used by MA only. Remove?
 private:
@@ -68,47 +74,43 @@ private:
    double            currentProfit;
    int               orderTickets[];
    datetime          lastOnTimerExecution;
+   bool              tradeOnTimerAllowed;
    string            stats;
    GridManager       *gm;
    Strategy          *st;
 
-   bool              IsNewBar();
-   void              OpenOpositeOrder();
+   void              SimulateTimer();
+   bool              IsTradeAllowedByNewBar();
+   bool              IsTradeAllowedByTimer();
+   void              Trade();
+   bool              CanOpenFirstOrder(int operation);
    bool              CanOpenRefillOrder(int operation);
+   bool              CanOpenAveragingOrder(int operation);
+   void              OpenOpositeOrder();
    bool              IsProfitReached();
    bool              IsLossReached();
+   double            CurrentLots();
    double            IncrementAndGetLots(double coef);
    double            IncrementLots(double value, double coef);
-   double            CurrentLots();
-   bool              CanOpenAveragingOrder(int operation);
-   bool              CanOpenFirstOrder(int operation);
   };
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-TradeManager::TradeManager(string inSymbol, int inPeriod, bool inIsTesting, Strategy *inStrategy)
+TradeManager::TradeManager(string inSymbol, int inPeriod, Strategy *inStrategy)
   {
    symbol = inSymbol;
    period = inPeriod;
-
-   gm = new GridManager(symbol, magic, gridsCount);
-
-   if(inIsTesting)
-     {
-      OnTimerExecution();
-     }
-
    st = inStrategy;
+   gm = new GridManager(symbol, magic, gridsCount);
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void TradeManager::OnTimerExecution()
+void TradeManager::~TradeManager()
   {
-   stats = showStats ? gm.Stats() : "";
-   lastOnTimerExecution = TimeCurrent();
+   delete gm;
   }
 
 //+------------------------------------------------------------------+
@@ -116,21 +118,81 @@ void TradeManager::OnTimerExecution()
 //+------------------------------------------------------------------+
 void TradeManager::OnTickExecution()
   {
-   if(!IsNewBar())
-     {
-      return;
-     }
-
    if(!IsTradeAllowed())
      {
       return;
      }
 
-   if(IsTesting() && TimeCurrent() > lastOnTimerExecution + refreshStatsPeriod)
+   SimulateTimer();
+
+   if(tradeOn == TRADE_ON_BAR)
      {
-      OnTimerExecution();
+      if(!IsTradeAllowedByNewBar())
+        {
+         return;
+        }
      }
 
+   if(tradeOn == TRADE_ON_TIMER)
+     {
+      if(!IsTradeAllowedByTimer())
+        {
+         return;
+        }
+     }
+
+   Trade();
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void TradeManager::SimulateTimer()
+  {
+   datetime currSec = TimeCurrent();
+   if(currSec >= lastOnTimerExecution + timerInterval)
+     {
+      lastOnTimerExecution = currSec;
+
+      stats = showStats ? gm.Stats() : "";
+      tradeOnTimerAllowed = true;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| https://www.mql5.com/ru/articles/159                             |
+//+------------------------------------------------------------------+
+bool TradeManager::IsTradeAllowedByNewBar()
+  {
+   datetime currentBarTime = iTime(symbol, period, 0);
+   if(lastBarTime != currentBarTime)
+     {
+      lastBarTime = currentBarTime;
+      return true;
+     }
+
+   return false;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool TradeManager::IsTradeAllowedByTimer()
+  {
+   if(tradeOnTimerAllowed)
+     {
+      tradeOnTimerAllowed = false;
+      return true; // disable flag but allow one-time trading
+     }
+
+   return false;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void TradeManager::Trade()
+  {
    gm.ResetPosition();
 
    while(gm.HasNext())
@@ -225,21 +287,6 @@ void TradeManager::OnTickExecution()
          continue;
         }
      }
-  }
-
-//+------------------------------------------------------------------+
-//| https://www.mql5.com/ru/articles/159                             |
-//+------------------------------------------------------------------+
-bool TradeManager::IsNewBar()
-  {
-   datetime currentBarTime = iTime(symbol, period, 0);
-   if(lastBarTime != currentBarTime)
-     {
-      lastBarTime = currentBarTime;
-      return true;
-     }
-
-   return false;
   }
 
 //+------------------------------------------------------------------+
@@ -363,11 +410,11 @@ bool TradeManager::CanOpenRefillOrder(int operation)
       return false;
      }
 
-   double trendLots = 0;
-
    int orderType = -1;
    int refills = 0;
    int ticket = -1;
+   double trendLots = 0;
+
    for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
      {
       if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
@@ -434,11 +481,11 @@ bool TradeManager::CanOpenAveragingOrder(int operation)
       return false;
      }
 
-   double trendLots = 0;
-
    int orderType = -1;
    int averagings = 0;
    int ticket = -1;
+   double trendLots = 0;
+
    for(int i = gm.GridOrdersCount() - 1; i >= 0; i--)
      {
       if(!OrderSelect(orderTickets[i], SELECT_BY_TICKET, MODE_TRADES))
@@ -523,22 +570,6 @@ bool TradeManager::CanOpenFirstOrder(int operation)
 int TradeManager::TotalOrdersCount()
   {
    return gm.TotalOrdersCount();
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void TradeManager::OnDeinitExecution(int reason)
-  {
-   delete gm;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-int TradeManager::GetRefreshStatsPeriod()
-  {
-   return refreshStatsPeriod;
   }
 
 //+------------------------------------------------------------------+

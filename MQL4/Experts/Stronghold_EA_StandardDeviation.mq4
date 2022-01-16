@@ -11,56 +11,41 @@
 #include <Stronghold_LIB_ST.mqh>
 
 // config
-extern string _100 = "==== Определение первого ордера сетки по стандартному отклонению ====";
-extern ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
-extern int sdMaPeriod = 20; // Период
-int sdMaShift = 0; // Сдвиг
-ENUM_MA_METHOD sdMaMethod = MODE_SMA; // Метод MA
-ENUM_APPLIED_PRICE sdAppliedPrice = PRICE_CLOSE; // Применяемая цена
-extern int sdBackToHistory = 10; // Назад в историю для определения тренда
-extern double sdLevel = 0.001; // Уровень для открытия ордера
-extern int sdBackPeriod = 6; // Исторический период
-extern double sdBackDiffCoef = 0.0006; // Историческая разница коеф.
-
-extern int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
-extern int osmaSlowEmaPeriod = 26; // OsMA - Slow EMA period
-extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
-extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
+input string _100 = "==== Определение первого ордера сетки по стандартному отклонению ====";
+input ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
+input int sdMaPeriod = 20; // Период
+input int sdMaShift = 0; // Сдвиг
+input ENUM_MA_METHOD sdMaMethod = MODE_SMA; // Метод MA
+input ENUM_APPLIED_PRICE sdAppliedPrice = PRICE_CLOSE; // Применяемая цена
+input int sdBackToHistory = 10; // Назад в историю для определения тренда
+input double sdLevel = 0.001; // Уровень для открытия ордера
+input int sdBackPeriod = 6; // Исторический период
+input double sdBackDiffCoef = 0.0006; // Историческая разница коеф.
+input int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
+input int osmaSlowEmaPeriod = 26; // OsMA - Slow EMA period
+input int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
+input ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
 Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 void OnInit()
   {
    st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
-
-   EventSetTimer(tm.GetRefreshStatsPeriod());
+   tm = new TradeManager(Symbol(), Period(), st);
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   EventKillTimer();
-
-   tm.OnDeinitExecution(reason);
-
-   delete st;
    delete tm;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void OnTimer()
-  {
-   tm.OnTimerExecution();
+   delete st;
   }
 
 //+------------------------------------------------------------------+
@@ -69,7 +54,6 @@ void OnTimer()
 void OnTick()
   {
    tm.OnTickExecution();
-
    Comment(tm.GetStats());
   }
 

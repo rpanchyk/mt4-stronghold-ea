@@ -23,35 +23,21 @@ Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 void OnInit()
   {
    st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
-
-   EventSetTimer(tm.GetRefreshStatsPeriod());
+   tm = new TradeManager(Symbol(), Period(), st);
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   EventKillTimer();
-
-   tm.OnDeinitExecution(reason);
-
-   delete st;
    delete tm;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void OnTimer()
-  {
-   tm.OnTimerExecution();
+   delete st;
   }
 
 //+------------------------------------------------------------------+
@@ -60,7 +46,6 @@ void OnTimer()
 void OnTick()
   {
    tm.OnTickExecution();
-
    Comment(tm.GetStats());
   }
 

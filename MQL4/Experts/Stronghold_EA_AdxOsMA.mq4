@@ -10,48 +10,35 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-extern string _100 = "==== Определение первого ордера сетки по ADX ====";
-extern int adxPeriod = 14; // ADX - Period
-extern ENUM_APPLIED_PRICE adxAppliedPrice = PRICE_CLOSE; // ADX - Applied price
-extern int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
-extern int osmaSlowEmaPeriod = 26; // OsMA - Slow EMA period
-extern int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
-extern ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
+// config
+input string _100 = "==== Определение первого ордера сетки по ADX ====";
+input int adxPeriod = 14; // ADX - Period
+input ENUM_APPLIED_PRICE adxAppliedPrice = PRICE_CLOSE; // ADX - Applied price
+input int osmaFastEmaPeriod = 12; // OsMA - Fast EMA period
+input int osmaSlowEmaPeriod = 26; // OsMA - Slow EMA period
+input int osmaMacdSmaPeriod = 9; // OsMA - MACD SMA period
+input ENUM_APPLIED_PRICE osmaAppliedPrice = PRICE_CLOSE; // Applied price
 
 // runtime
 Strategy *st;
 TradeManager *tm;
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 void OnInit()
   {
    st = new Strategy();
-   tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
-
-   EventSetTimer(tm.GetRefreshStatsPeriod());
+   tm = new TradeManager(Symbol(), Period(), st);
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   EventKillTimer();
-
-   tm.OnDeinitExecution(reason);
-
-   delete st;
    delete tm;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void OnTimer()
-  {
-   tm.OnTimerExecution();
+   delete st;
   }
 
 //+------------------------------------------------------------------+
@@ -60,7 +47,6 @@ void OnTimer()
 void OnTick()
   {
    tm.OnTickExecution();
-
    Comment(tm.GetStats());
   }
 
