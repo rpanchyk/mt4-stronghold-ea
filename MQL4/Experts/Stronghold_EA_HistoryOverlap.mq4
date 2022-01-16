@@ -10,15 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class CustomStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
-
 // config
 input string _100 = "==== Custom indicator parameters ====";
 input int InpHistoryLimit = 10000;
@@ -36,7 +27,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new CustomStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -76,7 +67,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CustomStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {

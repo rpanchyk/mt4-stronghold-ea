@@ -10,14 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class AdxOsMAStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
 extern string _100 = "==== Определение первого ордера сетки по ADX ====";
 extern int adxPeriod = 14; // ADX - Period
 extern ENUM_APPLIED_PRICE adxAppliedPrice = PRICE_CLOSE; // ADX - Applied price
@@ -35,7 +27,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new AdxOsMAStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -75,7 +67,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool AdxOsMAStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {

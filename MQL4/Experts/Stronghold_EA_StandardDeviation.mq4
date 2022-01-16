@@ -10,15 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class StandardDeviationStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
-
 // config
 extern string _100 = "==== Определение первого ордера сетки по стандартному отклонению ====";
 extern ENUM_TIMEFRAMES sdTimeframe = PERIOD_M1; // Таймфрейм
@@ -45,7 +36,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new StandardDeviationStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -85,7 +76,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool StandardDeviationStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
 //double prevLevel = iStdDev(Symbol(), sdTimeframe, sdMaPeriod, sdMaShift, sdMaMethod, sdAppliedPrice, 1);
 //double currLevel = iStdDev(Symbol(), sdTimeframe, sdMaPeriod, sdMaShift, sdMaMethod, sdAppliedPrice, 0);

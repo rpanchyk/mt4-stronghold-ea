@@ -10,15 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class MovingAverageStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
-
 // config
 extern string _100 = "==== Определение первого ордера сетки по скользяшке ====";
 extern ENUM_TIMEFRAMES maTimeframe = PERIOD_M1; // Таймфрейм
@@ -37,7 +28,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new MovingAverageStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -77,7 +68,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MovingAverageStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
    if(tm.TotalOrdersCount() > 0) // only one grid is allowed
      {

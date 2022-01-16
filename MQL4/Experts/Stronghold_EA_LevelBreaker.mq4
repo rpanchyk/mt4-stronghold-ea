@@ -10,15 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class LevelBreakerStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
-
 // runtime
 Strategy *st;
 TradeManager *tm;
@@ -28,7 +19,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new LevelBreakerStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -68,12 +59,12 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool LevelBreakerStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
-   //if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
-   //  {
-   //   return false;
-   //  }
+//if(iVolume(Symbol(), 0, 0) > 1) // analyze on open bars only
+//  {
+//   return false;
+//  }
 
    switch(operation)
      {

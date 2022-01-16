@@ -15,13 +15,4 @@ class Strategy
 public:
    virtual bool      CanOpenFirstOrder(int operation);
   };
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool Strategy::CanOpenFirstOrder(int operation)
-  {
-   Print(__FUNCTION__, ": ", "Abstract strategy is executed");
-   return false;
-  }
 //+------------------------------------------------------------------+

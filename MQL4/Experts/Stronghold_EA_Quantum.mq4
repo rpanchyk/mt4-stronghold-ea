@@ -10,15 +10,6 @@
 #include <Stronghold_LIB_TM.mqh>
 #include <Stronghold_LIB_ST.mqh>
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class CustomStrategy : public Strategy
-  {
-public:
-   virtual bool      CanOpenFirstOrder(int operation);
-  };
-
 // config
 input string _100 = "==== Quantum with filter by MACD ====";
 input int quantumPeriod = 8;
@@ -36,7 +27,7 @@ TradeManager *tm;
 //+------------------------------------------------------------------+
 void OnInit()
   {
-   st = new CustomStrategy();
+   st = new Strategy();
    tm = new TradeManager(Symbol(), Period(), IsTesting(), st);
 
    EventSetTimer(tm.GetRefreshStatsPeriod());
@@ -76,14 +67,14 @@ void OnTick()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CustomStrategy::CanOpenFirstOrder(int operation)
+bool Strategy::CanOpenFirstOrder(int operation)
   {
    switch(operation)
      {
       case OP_BUY:
-         return CustomIndicator(0) > 0;
+         return CustomIndicator(0, 0) > 0;
       case OP_SELL:
-         return CustomIndicator(1) > 0;
+         return CustomIndicator(1, 0) > 0;
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
@@ -93,8 +84,8 @@ bool CustomStrategy::CanOpenFirstOrder(int operation)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-double CustomIndicator(int buffer)
+double CustomIndicator(int buffer, int shift)
   {
-   return iCustom(Symbol(), Period(), "QuantumWithFilter_IND", "", quantumPeriod, "", macdFastEmaPeriod, macdSlowEmaPeriod, macdSignalPeriod, buffer, 0);
+   return iCustom(Symbol(), Period(), "QuantumWithFilter_IND", "", quantumPeriod, "", macdFastEmaPeriod, macdSlowEmaPeriod, macdSignalPeriod, buffer, shift);
   }
 //+------------------------------------------------------------------+
