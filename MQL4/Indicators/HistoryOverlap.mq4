@@ -73,7 +73,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-   if(rates_total < InpHistoryLimit + InpPeriod)
+   if(rates_total < InpPeriod)
      {
       return 0;
      }

@@ -16,7 +16,6 @@ input int InpHistoryLimit = 10000;
 input int InpPeriod = 1000;
 input int InpEstimatedBarApplyTo = 1;
 input int InpHistoricalBarApplyTo = 1;
-input int InpThreshold = 50;
 
 // runtime
 TradeManager *tm;
@@ -55,11 +54,11 @@ bool Strategy::CanOpenFirstOrder(int operation)
      {
       case OP_BUY:
         {
-         return CustomIndicator(1, 1) <= -InpThreshold && CustomIndicator(1, 2) <= -InpThreshold;
+         return CustomIndicator(1, 1) <= -InpPeriod;
         }
       case OP_SELL:
         {
-         return CustomIndicator(0, 1) >= InpThreshold && CustomIndicator(0, 2) >= InpThreshold;
+         return CustomIndicator(0, 1) >= InpPeriod;
         }
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
