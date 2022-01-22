@@ -28,6 +28,8 @@ struct Grid
    int               tickets[];
    double            trailingTakeProfit; // trailing upper price level
    double            trailingStopLoss; // trailing lower price level
+   bool              buyFirstConfirm;
+   bool              sellFirstConfirm;
   };
 
 //+------------------------------------------------------------------+
@@ -52,7 +54,14 @@ public:
    bool              FirstOrderIsOpenedOnBar();
    bool              UpdateTrailing(double profit, int step, int gridIndex);
    double            GetTrailingStopLoss(int gridIndex);
-   void              ResetTrailing(int gridIndex);
+
+   void              SetFirstConfirm(int operation, int gridIndex);
+   bool              HasFirstConfirm(int operation, int gridIndex);
+
+   void              SetBuyFirstConfirm(int gridIndex);
+   bool              HasBuyFirstConfirm(int gridIndex);
+   void              SetSellFirstConfirm(int gridIndex);
+   bool              HasSellFirstConfirm(int gridIndex);
 private:
    int               gridsCount;
    string            symbol;
@@ -209,12 +218,16 @@ void GridManager::InitGrids()
   {
    ArrayResize(grids, gridsCount);
 
-   int ticketsCount = ArraySize(sortedTickets);
-   for(int i = 0; i < gridsCount; i++)
+   for(int i = 0; i < gridsCount; i++) // reset grid state
      {
       ArrayResize(grids[i].tickets, 0);
+      grids[i].trailingTakeProfit = 0;
+      grids[i].trailingStopLoss = 0;
+      grids[i].buyFirstConfirm = false;
+      grids[i].sellFirstConfirm = false;
      }
 
+   int ticketsCount = ArraySize(sortedTickets);
    for(int i = 0; i < ticketsCount; i++)
      {
       if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
@@ -594,11 +607,80 @@ double GridManager::GetTrailingStopLoss(int gridIndex = -1)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void GridManager::ResetTrailing(int gridIndex = -1)
+void GridManager::SetFirstConfirm(int operation, int gridIndex = -1)
   {
    int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
 
-   grids[resolvedGridIndex].trailingTakeProfit = 0;
-   grids[resolvedGridIndex].trailingStopLoss = 0;
+   switch(operation)
+     {
+      case OP_BUY:
+         grids[resolvedGridIndex].buyFirstConfirm = true;
+         break;
+      case OP_SELL:
+         grids[resolvedGridIndex].sellFirstConfirm = true;
+         break;
+      default:
+         Print(__FUNCTION__, ": ", "Error operation not permitted: ", operation);
+         return;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::HasFirstConfirm(int operation, int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+
+   switch(operation)
+     {
+      case OP_BUY:
+         return grids[resolvedGridIndex].buyFirstConfirm;
+      case OP_SELL:
+         return grids[resolvedGridIndex].sellFirstConfirm;
+      default:
+         Print(__FUNCTION__, ": ", "Error operation not permitted: ", operation);
+         return false;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void GridManager::SetBuyFirstConfirm(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+
+   grids[resolvedGridIndex].buyFirstConfirm = true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::HasBuyFirstConfirm(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+
+   return grids[resolvedGridIndex].buyFirstConfirm;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void GridManager::SetSellFirstConfirm(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+
+   grids[resolvedGridIndex].sellFirstConfirm = true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool GridManager::HasSellFirstConfirm(int gridIndex = -1)
+  {
+   int resolvedGridIndex = gridIndex != -1 ? gridIndex : index;
+
+   return grids[resolvedGridIndex].sellFirstConfirm;
   }
 //+------------------------------------------------------------------+

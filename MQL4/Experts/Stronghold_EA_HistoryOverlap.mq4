@@ -50,20 +50,82 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool Strategy::CanOpenFirstOrder(int operation)
   {
+   bool hasFirstConfirm = tm.HasFirstConfirm(operation);
+
    switch(operation)
      {
       case OP_BUY:
         {
-         return CustomIndicator(1, 1) <= -InpPeriod;
+         if(!hasFirstConfirm)
+           {
+            if(BuyFirstConfirmApproved())
+              {
+               tm.SetFirstConfirm(operation);
+              }
+            return false;
+           }
+         else
+           {
+            return BuySecondConfirmApproved();
+           }
         }
       case OP_SELL:
         {
-         return CustomIndicator(0, 1) >= InpPeriod;
+         if(!hasFirstConfirm)
+           {
+            if(SellFirstConfirmApproved())
+              {
+               tm.SetFirstConfirm(operation);
+              }
+            return false;
+           }
+         else
+           {
+            return SellSecondConfirmApproved();
+           }
         }
       default:
          Print(__FUNCTION__, ": ", "Unsupported operation: ", operation);
          return false;
      }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool BuyFirstConfirmApproved()
+  {
+   return CustomIndicator(1, 1) <= -InpPeriod;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool BuySecondConfirmApproved()
+  {
+   double currSar = iSAR(Symbol(), Period(), 0.0018, 0.2, 1);
+   double currPrice = iOpen(Symbol(), Period(), 1);
+
+   return currSar <= currPrice;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool SellFirstConfirmApproved()
+  {
+   return CustomIndicator(0, 1) >= InpPeriod;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool SellSecondConfirmApproved()
+  {
+   double currSar = iSAR(Symbol(), Period(), 0.0018, 0.2, 1);
+   double currPrice = iClose(Symbol(), Period(), 1);
+
+   return currSar >= currPrice;
   }
 
 //+------------------------------------------------------------------+

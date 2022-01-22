@@ -63,9 +63,11 @@ public:
                     ~TradeManager();
 
    void              OnTickExecution();
+   void              SetFirstConfirm(int operation);
+   bool              HasFirstConfirm(int operation);
 
-   string            GetStats();
    int               TotalOrdersCount(); // TODO: wrongly used by MA only. Remove?
+   string            GetStats();
 private:
    string            symbol;
    int               period;
@@ -216,7 +218,6 @@ void TradeManager::Trade()
             if(currentProfit <= gm.GetTrailingStopLoss())
               {
                Print("Trailing stop reached, profit: ", currentProfit);
-               gm.ResetTrailing();
                gm.CloseOrdersForGrid();
                gm.InitTicketsAndGrids();
                continue;
@@ -564,6 +565,22 @@ bool TradeManager::CanOpenFirstOrder(int operation)
      }
 
    return st.CanOpenFirstOrder(operation);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void TradeManager::SetFirstConfirm(int operation)
+  {
+   gm.SetFirstConfirm(operation);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool TradeManager::HasFirstConfirm(int operation)
+  {
+   return gm.HasFirstConfirm(operation);
   }
 
 //+------------------------------------------------------------------+
