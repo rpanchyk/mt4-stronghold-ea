@@ -78,15 +78,15 @@ int OnCalculate(const int rates_total,
       return 0;
      }
 
-   int limit = rates_total - prev_calculated + (prev_calculated > 0 ? 1 : 0);
+   int limit = rates_total - prev_calculated + (prev_calculated > 0 ? 1 : -InpPeriod);
    limit = MathMin(limit, InpHistoryLimit);
 
-   for(int i = 0; i < limit; i++)
+   for(int i = 1; i < limit; i++)
      {
       if(InpEstimatedBarApplyTo == APPLY_TO_CLOSE_PRICE)
         {
          currStart = iOpen(NULL, 0, i);
-         currEnd = i == 0 ? Bid : iClose(NULL, 0, i);
+         currEnd = iClose(NULL, 0, i);
         }
       else
         {
