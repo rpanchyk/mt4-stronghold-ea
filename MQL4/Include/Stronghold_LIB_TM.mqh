@@ -2,8 +2,8 @@
 //|                                            Stronghold_LIB_TM.mqh |
 //|                                            Trade Manager Library |
 //+------------------------------------------------------------------+
-#property copyright   "Copyright 2020, FireTrot"
-#property link        "https://firetrot.com"
+#property copyright   "Copyright 2020, rpanchyk"
+#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
 #property description "Library serves trading operations"
 #property strict
 

@@ -1,12 +1,12 @@
 //+------------------------------------------------------------------+
 //|                                              AdxCrossingINGM.mq4 |
-//|                                         Copyright 2020, GoNaMore |
+//|                                         Copyright 2020, rpanchyk |
 //|       Based on 'ADX Crossing.mq4' from Amir - http://forexbig.ru |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2020, GoNaMore"
-#property link "https://github.com/gonamore/fx-adxcrossing-ind"
+#property copyright   "Copyright 2020, rpanchyk"
+#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
 #property description "Indicator shows possible entry points by ADX"
-#property version "1.2"
+#property version     "1.2"
 #property strict
 
 #property indicator_chart_window

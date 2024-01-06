@@ -1,11 +1,12 @@
 //+------------------------------------------------------------------+
 //|                                                Quantum Indicator |
-//|                                         Copyright 2021, FireTrot |
+//|                                         Copyright 2021, rpanchyk |
 //|                              Based on 'Quantum.mq4' 2010, zznbrm |
 //+------------------------------------------------------------------+
-#property copyright   "Copyright 2020, FireTrot"
-#property link        "https://firetrot.com"
+#property copyright   "Copyright 2020, rpanchyk"
+#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
 #property description "Indicator shows possible trade entry points"
+#property version     "1.0"
 //#property strict
 
 #property indicator_chart_window

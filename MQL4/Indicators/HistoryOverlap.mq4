@@ -2,8 +2,8 @@
 //|                                               HistoryOverlap.mq4 |
 //|                           Inspired by 'Quantum.mq4' 2010, zznbrm |
 //+------------------------------------------------------------------+
-#property copyright   "Copyright 2022, FireTrot"
-#property link        "https://firetrot.com"
+#property copyright   "Copyright 2022, rpanchyk"
+#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
 #property description "Shows when the bar (closing price or shadow) overlaps in history"
 #property version     "1.0"
 #property strict

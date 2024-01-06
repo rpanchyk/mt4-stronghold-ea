@@ -1,13 +1,13 @@
 //+------------------------------------------------------------------+
 //|                                          Level Breaker Indicator |
-//|                                         Copyright 2020, GoNaMore |
+//|                                         Copyright 2020, rpanchyk |
 //|                    Based on 'VIP Dynamic Support Resistance.mq4' |
 //|                      since 2010, KingLion - www.metastock.org.ua |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2020, GoNaMore"
-#property link "https://github.com/gonamore/fx-level-breaker-ind"
+#property copyright   "Copyright 2020, rpanchyk"
+#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
 #property description "Indicator shows possible trade entry points"
-#property version "1.0"
+#property version     "1.0"
 #property strict
 
 #property indicator_chart_window
