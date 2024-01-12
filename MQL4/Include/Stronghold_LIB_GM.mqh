@@ -3,7 +3,7 @@
 //|                                             Grid Manager Library |
 //+------------------------------------------------------------------+
 #property copyright   "Copyright 2020, rpanchyk"
-#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
+#property link        "https://github.com/rpanchyk/mt4-stronghold-ea"
 #property description "Library serves series of grids"
 #property strict
 

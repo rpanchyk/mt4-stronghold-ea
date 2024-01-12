@@ -1,1 +1,1 @@
-# Forex Expert Adviser for MT4
+# Forex Stronghold Expert Advisor for MT4

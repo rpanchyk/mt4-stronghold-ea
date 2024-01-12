@@ -4,7 +4,7 @@
 //|       Based on 'ADX Crossing.mq4' from Amir - http://forexbig.ru |
 //+------------------------------------------------------------------+
 #property copyright   "Copyright 2020, rpanchyk"
-#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
+#property link        "https://github.com/rpanchyk/mt4-stronghold-ea"
 #property description "Indicator shows possible entry points by ADX"
 #property version     "1.2"
 #property strict

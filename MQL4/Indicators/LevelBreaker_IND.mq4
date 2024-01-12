@@ -5,7 +5,7 @@
 //|                      since 2010, KingLion - www.metastock.org.ua |
 //+------------------------------------------------------------------+
 #property copyright   "Copyright 2020, rpanchyk"
-#property link        "https://github.com/rpanchyk/fx-stronghold-ea"
+#property link        "https://github.com/rpanchyk/mt4-stronghold-ea"
 #property description "Indicator shows possible trade entry points"
 #property version     "1.0"
 #property strict
